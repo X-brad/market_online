@@ -1,0 +1,24 @@
+# Dépendances Node.js
+node_modules/
+
+# Variables d'environnement (MongoDB Atlas, clés API...)
+.env
+.env.local
+.env.production
+
+# Build frontend
+dist/
+
+# Logs
+*.log
+
+# Fichiers système Windows
+Thumbs.db
+.DS_Store
+
+# Éditeur
+.vscode/
+
+# Fichiers temporaires
+*.tmp
+*.temp
