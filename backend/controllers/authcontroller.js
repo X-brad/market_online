@@ -1,0 +1,84 @@
+const jwt = require('jsonwebtoken')
+const User = require('../models/User')
+
+const genererToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' })
+
+exports.inscription = async (req, res) => {
+  try {
+    const { nom, prenom, pseudo, telephone, email, motDePasse, role, commune, coursiere } = req.body
+
+    const existeDeja = await User.findOne({
+      $or: [{ telephone }, { pseudo: pseudo?.toLowerCase() }]
+    })
+    if (existeDeja) {
+      return res.status(400).json({ succes: false, message: 'Ce numéro ou pseudo est déjà utilisé' })
+    }
+
+    const userData = { nom, prenom, pseudo, telephone, email, motDePasse, role, commune }
+    if (role === 'coursiere' && coursiere) userData.coursiere = coursiere
+
+    const user = await User.create(userData)
+    const token = genererToken(user._id)
+
+    res.status(201).json({
+      succes: true,
+      token,
+      user: {
+        id: user._id,
+        nom: user.nom,
+        prenom: user.prenom,
+        pseudo: user.pseudo,
+        telephone: user.telephone,
+        role: user.role,
+        commune: user.commune
+      }
+    })
+  } catch (err) {
+    res.status(400).json({ succes: false, message: err.message })
+  }
+}
+
+exports.connexion = async (req, res) => {
+  try {
+    const { identifiant, motDePasse } = req.body
+
+    if (!identifiant || !motDePasse) {
+      return res.status(400).json({ succes: false, message: 'Identifiant et mot de passe requis' })
+    }
+
+    const user = await User.findOne({
+      $or: [
+        { telephone: identifiant },
+        { pseudo: identifiant.toLowerCase() }
+      ]
+    }).select('+motDePasse')
+
+    if (!user) return res.status(401).json({ succes: false, message: 'Identifiants incorrects' })
+
+    const ok = await user.verifierMotDePasse(motDePasse)
+    if (!ok) return res.status(401).json({ succes: false, message: 'Identifiants incorrects' })
+
+    const token = genererToken(user._id)
+
+    res.json({
+      succes: true,
+      token,
+      user: {
+        id: user._id,
+        nom: user.nom,
+        prenom: user.prenom,
+        pseudo: user.pseudo,
+        telephone: user.telephone,
+        role: user.role,
+        commune: user.commune,
+        coursiere: user.role === 'coursiere' ? user.coursiere : undefined
+      }
+    })
+  } catch (err) {
+    res.status(500).json({ succes: false, message: err.message })
+  }
+}
+
+exports.moi = async (req, res) => {
+  res.json({ succes: true, user: req.user })
+}
