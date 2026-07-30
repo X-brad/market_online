@@ -1,23 +1,31 @@
-# Dépendances Node.js
-node_modules/
+# Dépendances Node.js (frontend + backend)
+**/node_modules/
 
-# Variables d'environnement (MongoDB Atlas, clés API...)
+# Variables d'environnement
 .env
+**/.env
+
+# Ignorer les variantes d'environnement
 .env.local
 .env.production
+.env.development
+
+# Autoriser les fichiers modèles
+!.env.example
+!**/.env.example
 
 # Build frontend
-dist/
+**/dist/
 
 # Logs
 *.log
 
-# Fichiers système Windows
+# Éditeurs
+.vscode/
+
+# Fichiers système
 Thumbs.db
 .DS_Store
-
-# Éditeur
-.vscode/
 
 # Fichiers temporaires
 *.tmp
