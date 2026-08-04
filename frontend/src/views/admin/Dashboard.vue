@@ -693,4 +693,34 @@ async function toggleMarche(m) {
 .toast.success { background: var(--vert); color: white; }
 .toast.warning { background: #f59e0b; color: white; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* MOBILE */
+@media (max-width: 860px) {
+  .admin { flex-direction: column; }
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  .sidebar-logo { font-size: 15px; margin-bottom: 0; white-space: nowrap; order: 1; }
+  .sidebar-role { display: none; }
+  .sidebar-nav { order: 3; flex-basis: 100%; flex-direction: row; overflow-x: auto; gap: 6px; }
+  .nav-item { flex-shrink: 0; white-space: nowrap; padding: 8px 12px; }
+  .btn-deconnexion { order: 2; margin-top: 0; margin-left: auto; flex-shrink: 0; white-space: nowrap; padding: 8px 12px; }
+  .main { overflow: visible; }
+  .topbar { padding: 16px 20px; flex-wrap: wrap; gap: 8px; }
+  .topbar h1 { font-size: 18px; }
+  .topbar p { display: none; }
+  .content { padding: 16px; overflow-y: visible; }
+  .stats-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .marches-admin-grid { grid-template-columns: 1fr; }
+  .toolbar { flex-direction: column; align-items: stretch; }
+}
 </style>

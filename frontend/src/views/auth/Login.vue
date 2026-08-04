@@ -52,7 +52,16 @@
           </div>
           <div class="form-group">
             <label>Code d'accès</label>
-            <input v-model="adminForm.code" type="password" placeholder="Code secret" required />
+            <input
+              v-model="adminForm.code"
+              type="password"
+              placeholder="Code secret"
+              autocomplete="new-password"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              required
+            />
           </div>
           <button type="submit" class="btn-admin" :disabled="chargementAdmin">
             {{ chargementAdmin ? 'Vérification...' : 'Accéder au back-office' }}
@@ -102,7 +111,7 @@ async function seConnecter() {
 
 async function seConnecterAdmin() {
   erreurAdmin.value = ''
-  if (adminForm.value.code !== ADMIN_CODE) {
+  if (adminForm.value.code.trim() !== ADMIN_CODE) {
     erreurAdmin.value = 'Code d\'accès incorrect'
     return
   }

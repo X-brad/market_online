@@ -246,4 +246,16 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 .statut-dot.disponible { background: #4ade80; }
 .statut-dot.hors_ligne { background: #9ca3af; }
 .statut-label { font-size: 12px; }
+
+/* MOBILE */
+@media (max-width: 640px) {
+  .nav-inner { flex-wrap: wrap; row-gap: 8px; }
+  .logo { font-size: 17px; }
+  .nav-links { gap: 6px; }
+  .nav-link { padding: 8px 10px; font-size: 13px; white-space: nowrap; }
+  .nav-prenom { display: none; }
+  .nav-avatar-wrap { padding: 6px 8px; }
+  .statut-toggle { padding: 6px 8px; }
+  .statut-label { display: none; }
+}
 </style>

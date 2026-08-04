@@ -734,6 +734,12 @@ function nouvelleCommande() {
 .step-prog-label { font-size: 12px; color: var(--texte-sec); white-space: nowrap; }
 .step-prog.active .step-prog-label { color: var(--vert-dark); font-weight: 600; }
 .step-prog.done .step-prog-label { color: var(--vert); }
+@media (max-width: 480px) {
+  .step-prog { gap: 0; }
+  .step-prog-dot { width: 24px; height: 24px; font-size: 11px; }
+  .step-prog-label { display: none; }
+  .step-prog:not(:last-child)::after { margin: 0 4px; }
+}
 
 /* HEADER */
 .dash-header { display: flex; align-items: center; justify-content: space-between; padding: 32px 0 24px; flex-wrap: wrap; gap: 20px; }

@@ -3,19 +3,14 @@ const mongoose = require('mongoose')
 const cors = require('cors')
 const { createServer } = require('http')
 const { init: initSocket } = require('./socket')
+const corsOrigins = require('./utils/corsOrigins')
 require('dotenv').config()
 
 const app = express()
 const httpServer = createServer(app)
 const io = initSocket(httpServer)
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://localhost:5174"
-  
-  
-  ],
-  
+  origin: corsOrigins.origin,
   credentials: true
 }))
 app.use(express.json())  // ← ajoute cette ligne ici;

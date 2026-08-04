@@ -1,11 +1,12 @@
 const { Server } = require('socket.io')
+const corsOrigins = require('./utils/corsOrigins')
 
 let io = null
 
 function init(httpServer) {
   io = new Server(httpServer, {
     cors: {
-      origin: ['http://localhost:5173', 'http://localhost:5174'],
+      origin: corsOrigins.origin,
       methods: ['GET', 'POST']
     }
   })
