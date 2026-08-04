@@ -88,27 +88,28 @@
             <RouterLink to="/profil" class="voir-tout">Voir tout →</RouterLink>
           </div>
           <div class="empty-histo" v-if="historiqueCommandes.length === 0">
-  <span>🛒</span>
-  <p>Aucune commande pour l'instant</p>
-  <button class="btn-commander" @click="etape = 1">Passer ma première commande →</button>
-</div>
-<div class="histo-list" v-else>
-  <div class="histo-item" v-for="h in historiqueCommandes.slice(0, 5)" :key="h._id">
-    <div class="histo-left">
-      <div class="histo-dot" :class="h.statut === 'livree' ? 'complete' : 'encours'"></div>
-      <div>
-        <p>{{ h.marche }}</p>
-        <span>{{ new Date(h.createdAt).toLocaleDateString('fr-FR') }}</span>
-      </div>
-    </div>
-    <div class="histo-right">
-      <strong>{{ h.totalPaye || '—' }} F</strong>
-      <span :class="h.statut === 'livree' ? 'complete' : 'encours'">
-        {{ h.statut === 'livree' ? '✓ Livré' : h.statut === 'en_cours' ? '⏳ En cours' : '📋 En attente' }}
-      </span>
-    </div>
-  </div>
-</div>
+            <span>🛒</span>
+            <p>Aucune commande pour l'instant</p>
+            <button class="btn-commander" @click="etape = 1">Passer ma première commande →</button>
+          </div>
+          <div class="histo-list" v-else>
+            <div class="histo-item" v-for="h in historiqueCommandes.slice(0, 5)" :key="h._id">
+              <div class="histo-left">
+                <div class="histo-dot" :class="h.statut === 'livree' ? 'complete' : 'encours'"></div>
+                <div>
+                  <p>{{ h.marche }}</p>
+                  <span>{{ new Date(h.createdAt).toLocaleDateString('fr-FR') }}</span>
+                </div>
+              </div>
+              <div class="histo-right">
+                <strong>{{ h.totalPaye || '—' }} F</strong>
+                <span :class="h.statut === 'livree' ? 'complete' : 'encours'">
+                  {{ h.statut === 'livree' ? '✓ Livré' : h.statut === 'en_cours' ? '⏳ En cours' : '📋 En attente' }}
+                </span>
+                <button class="btn-signaler" v-if="h.statut === 'livree'" @click="ouvrirLitige(h)">⚠️ Signaler</button>
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -159,12 +160,12 @@
         </div>
       </div>
 
- <!-- ÉTAPE 2 : CHOISIR UNE COURSIÈRE -->
+ <!-- ÉTAPE 2 : COURSIÈRES DISPONIBLES -->
 <div v-if="etape === 2">
   <div class="section-title">
     <span class="step-tag">Étape 2</span>
-    <h2>Choisissez votre coursière</h2>
-    <p>Coursières disponibles au <strong>{{ marcheChoisi }}</strong></p>
+    <h2>Coursières disponibles</h2>
+    <p>Votre demande sera envoyée à toutes les coursières disponibles au <strong>{{ marcheChoisi }}</strong> — la première à l'accepter s'en occupera</p>
   </div>
 
   <!-- CHARGEMENT -->
@@ -187,8 +188,7 @@
         v-for="c in coursieres"
         :key="c._id"
         class="coursiere-card"
-        :class="{ selected: coursiereChos?._id === c._id, occupee: c.statut === 'occupee' }"
-        @click="c.statut !== 'occupee' && (coursiereChos = c)"
+        :class="{ occupee: c.statut === 'occupee' }"
       >
         <div class="coursiere-top">
           <div class="coursiere-avatar">{{ c.initiales }}</div>
@@ -205,15 +205,12 @@
           <span>🛒 {{ c.courses }} courses</span>
           <span>📍 {{ c.distance }}</span>
         </div>
-        <div class="coursiere-footer" v-if="coursiereChos?._id === c._id">
-          <span class="selected-label">✓ Sélectionnée</span>
-        </div>
       </div>
     </div>
     <div class="action-row">
       <button class="btn-back" @click="etape = 1">← Retour</button>
-      <button class="btn-next" :disabled="!coursiereChos" @click="ouvrirTchat">
-        Contacter {{ coursiereChos?.nom?.split(' ')[0] }} →
+      <button class="btn-next" @click="publierDemande">
+        Publier ma demande →
       </button>
     </div>
   </div>
@@ -223,10 +220,18 @@
       <div v-if="etape === 3" class="tchat-page">
         <div class="section-title">
           <span class="step-tag">Étape 3</span>
-          <h2>Discussion avec {{ coursiereChos?.nom }}</h2>
-          <p>Partagez votre liste, convenez des frais avant de payer</p>
+          <h2>{{ enAttenteAssignation ? 'Recherche d\'une coursière...' : 'Discussion avec ' + coursiereChos?.nom }}</h2>
+          <p>{{ enAttenteAssignation ? 'Votre demande a été envoyée, en attente qu\'une coursière l\'accepte' : 'Partagez votre liste, convenez des frais avant de payer' }}</p>
         </div>
-        <div class="tchat-layout">
+
+        <!-- EN ATTENTE D'UNE COURSIÈRE -->
+        <div class="chargement" v-if="enAttenteAssignation">
+          <div class="spinner"></div>
+          <p>Recherche d'une coursière disponible au {{ marcheChoisi }}...</p>
+          <button class="btn-back" @click="etape = 2">← Annuler</button>
+        </div>
+
+        <div class="tchat-layout" v-if="!enAttenteAssignation">
           <div class="tchat-main">
             <div class="card tchat-card">
               <div class="tchat-header">
@@ -250,7 +255,7 @@
                   <div v-if="msg.type === 'liste'" class="bubble liste-bubble">
                     <div class="liste-bubble-header">📋 Liste de courses</div>
                     <div class="liste-bubble-content">{{ msg.text }}</div>
-                    <div class="liste-bubble-footer">{{ msg.marche }}</div>
+                    <div class="liste-bubble-footer">{{ marcheChoisi }}</div>
                   </div>
                   <div v-else-if="msg.type === 'devis'" class="bubble devis-bubble">
                     <div class="devis-bubble-header">💰 Proposition de devis</div>
@@ -259,15 +264,12 @@
                     <div class="devis-total"><span>Total frais</span><strong>{{ msg.devis.prestation + msg.devis.livraison }} F</strong></div>
                     <div class="devis-actions" v-if="msg.from === 'coursiere' && !devisAccepte">
                       <button class="btn-refuser-devis" @click="refuserDevis">Refuser</button>
-                      <button class="btn-accepter-devis" @click="accepterDevis(msg.devis)">Accepter ✓</button>
+                      <button class="btn-accepter-devis" @click="accepterDevis()">Accepter ✓</button>
                     </div>
                     <div class="devis-accepte" v-if="devisAccepte && msg.from === 'coursiere'">✓ Devis accepté</div>
                   </div>
                   <div v-else class="bubble">{{ msg.text }}</div>
                   <span class="msg-time">{{ msg.time }}</span>
-                </div>
-                <div class="message coursiere typing-indicator" v-if="enTrainDEcrire">
-                  <div class="bubble typing"><span></span><span></span><span></span></div>
                 </div>
               </div>
               <div class="tchat-input">
@@ -287,25 +289,18 @@
               <div class="recap-divider"></div>
               <div class="recap-section">
                 <p class="recap-section-title">Montants convenus</p>
-                <div class="recap-item"><span>Budget courses</span><strong :class="{ 'val-pending': !budgetCourses }">{{ budgetCourses ? budgetCourses + ' F' : 'À définir' }}</strong></div>
+                <div class="recap-item"><span>Budget courses</span><strong :class="{ 'val-pending': !budgetCourses }">{{ budgetCourses ? budgetCourses + ' F' : 'À définir par la coursière' }}</strong></div>
                 <div class="recap-item"><span>Frais prestation</span><strong :class="{ 'val-pending': !fraisPrestation }">{{ fraisPrestation ? fraisPrestation + ' F' : 'En discussion' }}</strong></div>
                 <div class="recap-item"><span>Frais livraison</span><strong :class="{ 'val-pending': !fraisLivraison }">{{ fraisLivraison ? fraisLivraison + ' F' : 'En discussion' }}</strong></div>
-                <div class="recap-item"><span>Frais service</span><strong class="val-fixed">200 F</strong></div>
+                <div class="recap-item"><span>Frais service</span><strong class="val-fixed">{{ fraisService }} F</strong></div>
               </div>
               <div class="recap-divider"></div>
               <div class="recap-total"><span>Total estimé</span><strong>{{ totalEstime }} F CFA</strong></div>
-              <div class="budget-section" v-if="!devisAccepte">
-                <p class="recap-section-title">Votre budget courses</p>
-                <input v-model.number="budgetCourses" type="number" placeholder="Montant en F CFA" class="budget-input" />
-              </div>
-              <button class="btn-next" style="width:100%;margin-top:16px" :disabled="!devisAccepte || !budgetCourses" @click="etape = 4">
+              <button class="btn-next" style="width:100%;margin-top:16px" :disabled="!devisAccepte" @click="etape = 4">
                 {{ devisAccepte ? 'Procéder au paiement →' : 'En attente d\'accord...' }}
               </button>
             </div>
           </div>
-        </div>
-        <div class="action-row">
-          <button class="btn-back" @click="etape = 2">← Changer de coursière</button>
         </div>
       </div>
 
@@ -322,9 +317,9 @@
             <h3>Récapitulatif de paiement</h3>
             <div class="paiement-details">
               <div class="recap-item"><span>Budget courses</span><strong>{{ budgetCourses }} F CFA</strong></div>
-              <div class="recap-item"><span>Frais prestation coursière</span><strong>{{ fraisPrestation }} F CFA</strong></div>
+              <div class="recap-item"><span>Frais prestation</span><strong>{{ fraisPrestation }} F CFA</strong></div>
               <div class="recap-item"><span>Frais de livraison</span><strong>{{ fraisLivraison }} F CFA</strong></div>
-              <div class="recap-item"><span>Frais de service MamiMarché</span><strong>200 F CFA</strong></div>
+              <div class="recap-item"><span>Frais de service MamiMarché</span><strong>{{ fraisService }} F CFA</strong></div>
               <div class="recap-divider"></div>
               <div class="recap-total big"><span>Total à payer</span><strong>{{ totalEstime }} F CFA</strong></div>
             </div>
@@ -349,16 +344,44 @@
           <div class="confirm-step pending">⏳ Courses en cours...</div>
           <div class="confirm-step pending">🏠 Livraison à domicile</div>
         </div>
+        <div class="rating-section" v-if="!noteEnvoyee">
+          <p>Notez votre coursière</p>
+          <div class="stars">
+            <span
+              v-for="n in 5"
+              :key="n"
+              class="star"
+              :class="{ active: n <= (noteHover || 0) }"
+              @mouseenter="noteHover = n"
+              @mouseleave="noteHover = 0"
+              @click="envoyerNote(n)"
+            >★</span>
+          </div>
+        </div>
+        <p class="rating-done" v-else>Merci pour votre note ⭐ {{ noteDonnee }}/5</p>
         <button class="btn-next" @click="nouvelleCommande">Passer une nouvelle commande</button>
       </div>
 
+    </div>
+
+    <!-- MODAL LITIGE -->
+    <div class="modal-overlay" v-if="litigeCourseId" @click.self="litigeCourseId = null">
+      <div class="modal-litige">
+        <h3>⚠️ Signaler un problème</h3>
+        <input v-model="litigeTitre" placeholder="Titre du problème" class="litige-input" />
+        <textarea v-model="litigeDescription" placeholder="Décrivez le problème..." rows="4" class="litige-textarea"></textarea>
+        <div class="modal-litige-btns">
+          <button class="btn-back" @click="litigeCourseId = null">Annuler</button>
+          <button class="btn-next" :disabled="!litigeTitre.trim()" @click="envoyerLitige">Envoyer</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 <script setup>
 import api from '../../api/axios.js'
 import socket from '../../api/socket.js'
-import { ref, computed, nextTick, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toast'
 
@@ -373,9 +396,11 @@ const messagesEl = ref(null)
 const budgetCourses = ref(null)
 const fraisPrestation = ref(null)
 const fraisLivraison = ref(null)
-const enTrainDEcrire = ref(false)
+const fraisService = ref(200)
+
 const devisRecu = ref(false)
 const devisAccepte = ref(false)
+const enAttenteAssignation = ref(false)
 const courseId = ref(null)
 const historiqueCommandes = ref([])
 
@@ -390,8 +415,25 @@ async function chargerHistorique() {
   }
 }
 
+async function chargerMarches() {
+  try {
+    const res = await api.get('/marches', { params: { actif: true } })
+    marches.value = res.data.marches
+  } catch (err) {
+    console.error('Erreur marchés:', err)
+  }
+}
+
 onMounted(() => {
   chargerHistorique()
+  chargerMarches()
+})
+
+onUnmounted(() => {
+  socket.off('nouveau_message')
+  socket.off('devis_propose')
+  socket.off('course_assignee')
+  if (socket.connected) socket.disconnect()
 })
 
 const initiales = computed(() => {
@@ -399,9 +441,8 @@ const initiales = computed(() => {
   if (!u) return '?'
   return (u.prenom?.[0] || '') + (u.nom?.[0] || '')
 })
-
 const totalEstime = computed(() => {
-  return (budgetCourses.value || 0) + (fraisPrestation.value || 0) + (fraisLivraison.value || 0) + 200
+  return (budgetCourses.value || 0) + (fraisPrestation.value || 0) + (fraisLivraison.value || 0) + fraisService.value
 })
 
 const headerStats = ref([
@@ -424,14 +465,7 @@ const etapes = [
   { label: 'Paiement' }
 ]
 
-const marches = [
-  { nom: 'Marché de Cocody', commune: 'Cocody', icon: '🏪' },
-  { nom: 'Cocovico', commune: 'Cocody', icon: '🛒' },
-  { nom: "Marché d'Adjamé", commune: 'Adjamé', icon: '🏪' },
-  { nom: 'Marché de Treichville', commune: 'Treichville', icon: '🛒' },
-  { nom: 'Marché de Koumassi', commune: 'Koumassi', icon: '🏪' },
-  { nom: 'Marché de Bingerville', commune: 'Bingerville', icon: '🛒' }
-]
+const marches = ref([])
 
 const coursieres = ref([])
 const chargementCoursieres = ref(false)
@@ -455,8 +489,8 @@ async function chargerCoursieres() {
 }
 const messages = ref([])
 
-function getTime() {
-  return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+function getTime(date) {
+  return new Date(date || Date.now()).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
 function scrollBottom() {
@@ -465,13 +499,39 @@ function scrollBottom() {
   })
 }
 
-function simulerReponse(text, delay = 1500, type = 'normal', extra = {}) {
-  enTrainDEcrire.value = true
-  setTimeout(() => {
-    enTrainDEcrire.value = false
-    messages.value.push({ from: 'coursiere', text, time: getTime(), type, ...extra })
-    scrollBottom()
-  }, delay)
+function mapCoursiereUser(u) {
+  if (!u) return null
+  return {
+    _id: u._id,
+    nom: `${u.prenom} ${u.nom}`,
+    initiales: (u.prenom?.[0] || '') + (u.nom?.[0] || ''),
+    marche: u.coursiere?.marches?.[0] || marcheChoisi.value,
+    type: u.coursiere?.typeProfile === 'premium' ? 'Premium' : 'Standard',
+    note: u.coursiere?.nombreAvis > 0
+      ? Math.round(u.coursiere.note / u.coursiere.nombreAvis * 10) / 10
+      : 0
+  }
+}
+
+function formaterMessage(msg) {
+  return {
+    from: msg.expediteur === authStore.user?.id ? 'client' : 'coursiere',
+    text: msg.texte,
+    type: msg.type,
+    devis: msg.devis,
+    time: getTime(msg.createdAt)
+  }
+}
+
+async function envoyerMessageApi(payload) {
+  try {
+    await api.post('/messages', {
+      course: courseId.value,
+      ...payload
+    })
+  } catch (err) {
+    toast.error('Erreur lors de l\'envoi du message')
+  }
 }
 
 function lancerCommande(nomMarche) {
@@ -479,7 +539,7 @@ function lancerCommande(nomMarche) {
   etape.value = 1
 }
 
-async function ouvrirTchat() {
+async function publierDemande() {
   try {
     const res = await api.post('/courses', {
       marche: marcheChoisi.value,
@@ -488,86 +548,82 @@ async function ouvrirTchat() {
       mode: 'standard'
     })
     courseId.value = res.data.course._id
+    coursiereChos.value = null
+    enAttenteAssignation.value = true
+    devisRecu.value = false
+    devisAccepte.value = false
+    budgetCourses.value = null
+    fraisPrestation.value = null
+    fraisLivraison.value = null
+    messages.value = []
+
+    const histRes = await api.get(`/courses/${courseId.value}/messages`)
+    messages.value = histRes.data.messages.map(formaterMessage)
 
     socket.connect()
     socket.emit('rejoindre_course', courseId.value)
+    socket.off('nouveau_message')
+    socket.off('devis_propose')
+    socket.off('course_assignee')
+
+    socket.on('course_assignee', ({ course }) => {
+      coursiereChos.value = mapCoursiereUser(course.coursiere)
+      enAttenteAssignation.value = false
+      toast.success(`${coursiereChos.value.nom} a accepté votre commande !`)
+    })
+
     socket.on('nouveau_message', (msg) => {
-      messages.value.push(msg)
+      messages.value.push(formaterMessage(msg))
+      scrollBottom()
+    })
+
+    socket.on('devis_propose', ({ course }) => {
+      budgetCourses.value = course.budgetCourses
+      fraisPrestation.value = course.fraisPrestation
+      fraisLivraison.value = course.fraisLivraison
+      fraisService.value = course.fraisService || 200
+      devisRecu.value = true
+      messages.value.push({
+        from: 'coursiere',
+        type: 'devis',
+        devis: { prestation: course.fraisPrestation, livraison: course.fraisLivraison },
+        time: getTime()
+      })
       scrollBottom()
     })
 
     etape.value = 3
-    messages.value = []
-    devisRecu.value = false
-    devisAccepte.value = false
-
-    setTimeout(() => {
-      messages.value.push({
-        from: 'coursiere',
-        text: `Bonjour ! Je suis ${coursiereChos.value?.nom}, coursière au ${coursiereChos.value?.marche} 😊 Je suis disponible pour vos courses. Envoyez-moi votre liste !`,
-        time: getTime(),
-        type: 'normal'
-      })
-      scrollBottom()
-    }, 500)
-
-    toast.success('Coursière contactée avec succès !')
+    toast.success('Demande publiée ! En attente qu\'une coursière l\'accepte...')
   } catch (err) {
     toast.error('Erreur lors de la création de la course')
     console.error(err)
   }
 }
 
-function envoyerMessage() {
+async function envoyerMessage() {
   if (!nouveauMsg.value.trim() || devisAccepte.value) return
-  messages.value.push({ from: 'client', text: nouveauMsg.value, time: getTime(), type: 'normal' })
-  const msg = nouveauMsg.value.toLowerCase()
+  const texte = nouveauMsg.value
   nouveauMsg.value = ''
-  scrollBottom()
-  if (msg.includes('merci') || msg.includes('ok') || msg.includes('d\'accord')) {
-    simulerReponse('Parfait ! N\'hésitez pas à m\'envoyer votre liste de courses 📋', 1200)
-  } else if (msg.includes('bonjour') || msg.includes('bonsoir') || msg.includes('salut')) {
-    simulerReponse('Bonjour ! Comment puis-je vous aider aujourd\'hui ? 😊', 1000)
-  } else {
-    simulerReponse('D\'accord, je prends note. Avez-vous d\'autres précisions à ajouter ?', 1800)
-  }
+  await envoyerMessageApi({ texte, type: 'normal' })
 }
 
-function envoyerListe() {
+async function envoyerListe() {
   if (!liste.value.trim()) return
-  messages.value.push({ from: 'client', text: liste.value, time: getTime(), type: 'liste', marche: marcheChoisi.value })
-  scrollBottom()
-  simulerReponse('J\'ai bien reçu votre liste 👍 Je vais vérifier la disponibilité des produits et vous proposer un devis rapidement.', 2000)
-  setTimeout(() => {
-    simulerReponse('', 4000, 'devis', { devis: { prestation: 1000, livraison: 800 } })
-    devisRecu.value = true
-  }, 2000)
+  await envoyerMessageApi({ texte: liste.value, type: 'liste' })
 }
 
-function demanderDevis() {
-  messages.value.push({ from: 'client', text: 'Pouvez-vous me proposer un devis pour vos frais ?', time: getTime(), type: 'normal' })
-  scrollBottom()
-  simulerReponse('Bien sûr ! Voici ma proposition :', 1500)
-  setTimeout(() => {
-    simulerReponse('', 3000, 'devis', { devis: { prestation: 1000, livraison: 800 } })
-    devisRecu.value = true
-  }, 1500)
+async function demanderDevis() {
+  await envoyerMessageApi({ texte: 'Pouvez-vous me proposer un devis pour vos frais ?', type: 'normal' })
 }
 
-function accepterDevis(devis) {
-  fraisPrestation.value = devis.prestation
-  fraisLivraison.value = devis.livraison
+async function accepterDevis() {
   devisAccepte.value = true
-  messages.value.push({ from: 'client', text: '✅ J\'accepte votre devis. Je vais procéder au paiement.', time: getTime(), type: 'normal' })
-  scrollBottom()
-  simulerReponse('Parfait ! Merci pour votre confiance 🙏 Je serai prête dès réception de votre paiement.', 1500)
+  await envoyerMessageApi({ texte: '✅ J\'accepte votre devis. Je vais procéder au paiement.', type: 'normal' })
   toast.success('Devis accepté ! Procédez au paiement.')
 }
 
-function refuserDevis() {
-  messages.value.push({ from: 'client', text: 'Je souhaite négocier les frais, pouvez-vous revoir votre proposition ?', time: getTime(), type: 'normal' })
-  scrollBottom()
-  simulerReponse('Je comprends. Quel montant vous conviendrait mieux ?', 1500)
+async function refuserDevis() {
+  await envoyerMessageApi({ texte: 'Je souhaite négocier les frais, pouvez-vous revoir votre proposition ?', type: 'normal' })
 }
 
 function confirmerAccord() {
@@ -584,12 +640,53 @@ async function payerWave() {
     etape.value = 5
     headerStats.value[0].val = String(parseInt(headerStats.value[0].val) + 1)
     toast.success('Paiement effectué avec succès ! 🎉')
-    socket.disconnect()
+    if (socket.connected) socket.disconnect()
   } catch (err) {
     toast.error('Erreur lors du paiement')
     console.error(err)
   }
 }
+
+const noteHover = ref(0)
+const noteDonnee = ref(0)
+const noteEnvoyee = ref(false)
+
+async function envoyerNote(n) {
+  try {
+    await api.put(`/courses/${courseId.value}/noter`, { note: n, commentaire: '' })
+    noteDonnee.value = n
+    noteEnvoyee.value = true
+    toast.success('Merci pour votre note !')
+  } catch (err) {
+    toast.error('Erreur lors de l\'envoi de la note')
+  }
+}
+
+const litigeCourseId = ref(null)
+const litigeTitre = ref('')
+const litigeDescription = ref('')
+
+function ouvrirLitige(h) {
+  litigeCourseId.value = h._id
+  litigeTitre.value = ''
+  litigeDescription.value = ''
+}
+
+async function envoyerLitige() {
+  if (!litigeTitre.value.trim()) return
+  try {
+    await api.post('/litiges', {
+      courseId: litigeCourseId.value,
+      titre: litigeTitre.value,
+      description: litigeDescription.value
+    })
+    toast.success('Signalement envoyé, notre équipe va l\'examiner.')
+    litigeCourseId.value = null
+  } catch (err) {
+    toast.error('Erreur lors de l\'envoi du signalement')
+  }
+}
+
 function nouvelleCommande() {
   etape.value = 0
   liste.value = ''
@@ -601,7 +698,13 @@ function nouvelleCommande() {
   messages.value = []
   devisRecu.value = false
   devisAccepte.value = false
+  enAttenteAssignation.value = false
   courseId.value = null
+  noteHover.value = 0
+  noteDonnee.value = 0
+  noteEnvoyee.value = false
+  if (socket.connected) socket.disconnect()
+  chargerHistorique()
 }
 </script>
 
@@ -734,7 +837,6 @@ function nouvelleCommande() {
 .coursieres-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 20px; }
 .coursiere-card { background: white; border-radius: 14px; padding: 18px; border: 1.5px solid var(--bordure); cursor: pointer; transition: all 0.2s; }
 .coursiere-card:hover:not(.occupee) { border-color: var(--vert); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(29,158,117,0.1); }
-.coursiere-card.selected { border-color: var(--vert); background: var(--vert-light); }
 .coursiere-card.occupee { opacity: 0.5; cursor: not-allowed; }
 .coursiere-top { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .coursiere-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--vert); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
@@ -745,8 +847,6 @@ function nouvelleCommande() {
 .statut-badge.disponible { background: #dcfce7; color: #166534; }
 .statut-badge.occupee { background: #fef2f2; color: #dc2626; }
 .coursiere-stats { display: flex; gap: 10px; font-size: 12px; color: var(--texte-sec); flex-wrap: wrap; }
-.coursiere-footer { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--bordure); }
-.selected-label { font-size: 13px; font-weight: 700; color: var(--vert); }
 
 /* TCHAT LAYOUT */
 .tchat-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; margin-bottom: 16px; }
@@ -787,11 +887,6 @@ function nouvelleCommande() {
 .btn-refuser-devis { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--bordure); background: white; font-size: 12px; cursor: pointer; color: var(--texte-sec); }
 .btn-accepter-devis { flex: 2; padding: 8px; border-radius: 8px; border: none; background: var(--vert); color: white; font-size: 12px; font-weight: 700; cursor: pointer; }
 .devis-accepte { padding: 8px 14px 10px; font-size: 12px; color: var(--vert); font-weight: 600; }
-.typing { display: flex; gap: 4px; align-items: center; padding: 12px 16px !important; }
-.typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--texte-sec); animation: typing 1.2s infinite; display: inline-block; }
-.typing span:nth-child(2) { animation-delay: 0.2s; }
-.typing span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes typing { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-6px);opacity:1} }
 .tchat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 0.5px solid var(--bordure); align-items: center; background: white; }
 .tchat-input input { flex: 1; padding: 10px 16px; border: 1px solid var(--bordure); border-radius: 24px; font-size: 13px; background: var(--fond); color: var(--texte); transition: border 0.2s; }
 .tchat-input input:focus { border-color: var(--vert); outline: none; }
@@ -813,9 +908,6 @@ function nouvelleCommande() {
 .recap-divider { height: 1px; background: var(--bordure); margin: 8px 0; }
 .recap-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; font-size: 14px; font-weight: 700; }
 .recap-total strong { color: var(--vert-dark); font-size: 18px; }
-.budget-section { margin-top: 8px; }
-.budget-input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--bordure); border-radius: var(--radius); font-size: 13px; margin-top: 6px; color: var(--texte); }
-.budget-input:focus { border-color: var(--vert); outline: none; }
 
 /* PAIEMENT */
 .paiement-wrap { max-width: 480px; margin: 0 auto; }
@@ -848,4 +940,23 @@ function nouvelleCommande() {
 .btn-back:hover { border-color: var(--vert); color: var(--vert); }
 .recap-total.big { font-size: 18px; }
 .recap-total.big strong { font-size: 22px; }
+
+/* SIGNALER / LITIGE */
+.btn-signaler { margin-left: 10px; background: none; border: none; color: #dc2626; font-size: 11px; font-weight: 600; cursor: pointer; }
+.btn-signaler:hover { text-decoration: underline; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 24px; backdrop-filter: blur(4px); }
+.modal-litige { background: white; border-radius: 20px; padding: 32px; max-width: 420px; width: 100%; box-shadow: 0 24px 60px rgba(0,0,0,0.2); }
+.modal-litige h3 { font-size: 18px; font-weight: 800; margin: 0 0 16px; color: var(--texte); }
+.litige-input, .litige-textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--bordure); border-radius: var(--radius); padding: 10px 12px; font-size: 14px; font-family: inherit; color: var(--texte); margin-bottom: 10px; }
+.litige-textarea { resize: none; }
+.litige-input:focus, .litige-textarea:focus { border-color: var(--vert); outline: none; }
+.modal-litige-btns { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* NOTATION */
+.rating-section { margin-bottom: 24px; }
+.rating-section p { font-size: 14px; color: var(--texte-sec); margin-bottom: 10px; }
+.stars { display: flex; gap: 6px; justify-content: center; }
+.star { font-size: 32px; color: var(--bordure); cursor: pointer; transition: color 0.15s; }
+.star.active { color: #f59e0b; }
+.rating-done { font-size: 14px; color: var(--vert-dark); font-weight: 600; margin-bottom: 24px; }
 </style>

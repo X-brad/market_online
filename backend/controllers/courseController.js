@@ -1,5 +1,9 @@
+
+ const { calculerFraisPrestation } = require('../utils/calculPrestation')
  const Course = require('../models/Course')
 const User = require('../models/User')
+const Settings = require('../models/Settings')
+const { getIO } = require('../socket')
 
 // POST /api/courses — Créer une course
 exports.creerCourse = async (req, res) => {
@@ -14,16 +18,23 @@ exports.creerCourse = async (req, res) => {
       mode: mode || 'standard'
     })
 
+    getIO()?.emit('nouvelle_course', course)
+
     res.status(201).json({ succes: true, course })
   } catch (err) {
     res.status(400).json({ succes: false, message: err.message })
   }
 }
 
-// GET /api/courses/mes-courses — Courses du client connecté
+// GET /api/courses/mes-courses — Courses de l'utilisateur connecté (client ou coursière)
 exports.mesCourses = async (req, res) => {
   try {
-    const courses = await Course.find({ client: req.user._id })
+    const filtre = req.user.role === 'coursiere'
+      ? { coursiere: req.user._id }
+      : { client: req.user._id }
+
+    const courses = await Course.find(filtre)
+      .populate('client', 'nom prenom telephone')
       .populate('coursiere', 'nom prenom telephone')
       .sort({ createdAt: -1 })
 
@@ -76,6 +87,9 @@ exports.accepterCourse = async (req, res) => {
       $inc: { 'coursiere.coursesAujourdhui': 1 }
     })
 
+    await course.populate('coursiere', 'nom prenom telephone')
+    getIO()?.to(course._id.toString()).emit('course_assignee', { course })
+
     res.json({ succes: true, course })
   } catch (err) {
     res.status(500).json({ succes: false, message: err.message })
@@ -90,8 +104,16 @@ exports.mettreAJourStatut = async (req, res) => {
 
     if (!course) return res.status(404).json({ succes: false, message: 'Course introuvable' })
 
+    const estClient = course.client.toString() === req.user._id.toString()
+    const estCoursiere = course.coursiere && course.coursiere.toString() === req.user._id.toString()
+    if (!estClient && !estCoursiere && req.user.role !== 'admin') {
+      return res.status(403).json({ succes: false, message: 'Accès refusé' })
+    }
+
     course.statut = statut
     await course.save()
+
+    getIO()?.to(course._id.toString()).emit('statut_change', { course })
 
     res.json({ succes: true, course })
   } catch (err) {
@@ -102,23 +124,32 @@ exports.mettreAJourStatut = async (req, res) => {
 // PUT /api/courses/:id/devis — Coursière propose un devis
 exports.proposerDevis = async (req, res) => {
   try {
-    const { fraisPrestation, fraisLivraison, budgetCourses } = req.body
+    const { fraisLivraison, budgetCourses } = req.body
     const course = await Course.findById(req.params.id)
 
     if (!course) return res.status(404).json({ succes: false, message: 'Course introuvable' })
 
+    if (!course.coursiere || course.coursiere.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ succes: false, message: 'Vous n\'êtes pas assignée à cette course' })
+    }
+
+    const settings = await Settings.getSettings()
+    const fraisPrestation = calculerFraisPrestation(budgetCourses)
+
     course.fraisPrestation = fraisPrestation
     course.fraisLivraison = fraisLivraison
     course.budgetCourses = budgetCourses
-    course.totalPaye = budgetCourses + fraisPrestation + fraisLivraison + 200
+    course.fraisService = settings.fraisService
+    course.totalPaye = budgetCourses + fraisPrestation + fraisLivraison + settings.fraisService
     await course.save()
 
-    res.json({ succes: true, course })
+    getIO()?.to(course._id.toString()).emit('devis_propose', { course })
+
+    res.json({ succes: true, course, fraisPrestation })
   } catch (err) {
-    res.status(500).json({ succes: false, message: err.message })
+    res.status(400).json({ succes: false, message: err.message })
   }
 }
-
 // PUT /api/courses/:id/noter — Client note la coursière
 exports.noterCoursiere = async (req, res) => {
   try {
@@ -126,6 +157,13 @@ exports.noterCoursiere = async (req, res) => {
     const course = await Course.findById(req.params.id)
 
     if (!course) return res.status(404).json({ succes: false, message: 'Course introuvable' })
+
+    if (course.client.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ succes: false, message: 'Accès refusé' })
+    }
+    if (course.noteClient !== null) {
+      return res.status(400).json({ succes: false, message: 'Cette course a déjà été notée' })
+    }
 
     course.noteClient = note
     course.commentaireClient = commentaire

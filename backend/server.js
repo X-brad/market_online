@@ -2,17 +2,12 @@ const express = require('express')
 const mongoose = require('mongoose')
 const cors = require('cors')
 const { createServer } = require('http')
-const { Server } = require('socket.io')
+const { init: initSocket } = require('./socket')
 require('dotenv').config()
 
 const app = express()
 const httpServer = createServer(app)
-const io = new Server(httpServer, {
-  cors: {
-    origin: 'http://localhost:5173',
-    methods: ['GET', 'POST']
-  }
-})
+const io = initSocket(httpServer)
 app.use(cors({
   origin: [
     "http://localhost:5173",
@@ -30,6 +25,9 @@ app.use('/api/coursiere', require('./routes/coursiere'))
 app.use('/api/admin', require('./routes/admin'))
 app.use('/api/courses', require('./routes/courses'))
 app.use('/api/transactions', require('./routes/transactions'))
+app.use('/api/messages', require('./routes/messages'))
+app.use('/api/litiges', require('./routes/litiges'))
+app.use('/api/marches', require('./routes/marches'))
 
 app.get('/', (req, res) => {
   res.json({ message: 'MamiMarché API ✅' })
@@ -43,29 +41,6 @@ io.on('connection', (socket) => {
   socket.on('rejoindre_course', (courseId) => {
     socket.join(courseId)
     console.log(`📦 Socket ${socket.id} a rejoint la room ${courseId}`)
-  })
-
-  // Envoyer un message
-  socket.on('envoyer_message', (data) => {
-    const { courseId, message } = data
-    io.to(courseId).emit('nouveau_message', message)
-  })
-
-  // Statut coursière
-  socket.on('statut_coursiere', (data) => {
-    const { userId, statut } = data
-    io.emit('coursiere_statut_change', { userId, statut })
-  })
-
-  // Nouvelle course disponible
-  socket.on('nouvelle_course', (data) => {
-    io.emit('course_disponible', data)
-  })
-
-  // Course acceptée
-  socket.on('course_acceptee', (data) => {
-    const { courseId, coursiere } = data
-    io.to(courseId).emit('course_assignee', { coursiere })
   })
 
   // Déconnexion
@@ -90,5 +65,3 @@ mongoose.connect(process.env.MONGO_URI)
     console.error('❌ Erreur MongoDB :', err.message)
     process.exit(1)
   })
-
-module.exports = { io }

@@ -2,6 +2,8 @@ const express = require('express')
 const router = express.Router()
 const { proteger, autoriser } = require('../middleware/auth')
 const User = require('../models/User')
+const Settings = require('../models/Settings')
+const { getIO } = require('../socket')
 
 // GET /api/coursiere/disponibles
 router.get('/disponibles', proteger, async (req, res) => {
@@ -50,6 +52,7 @@ router.put('/statut', proteger, autoriser('coursiere'), async (req, res) => {
   try {
     const { statut } = req.body
     await User.findByIdAndUpdate(req.user._id, { 'coursiere.statut': statut })
+    getIO()?.emit('coursiere_statut_change', { userId: req.user._id, statut })
     res.json({ succes: true, message: 'Statut mis à jour' })
   } catch (err) {
     res.status(500).json({ succes: false, message: err.message })
@@ -60,7 +63,12 @@ router.put('/statut', proteger, autoriser('coursiere'), async (req, res) => {
 router.put('/unites', proteger, autoriser('coursiere'), async (req, res) => {
   try {
     const { type } = req.body
-    const quota = type === 'premium' ? 15 : 10
+    const settings = await Settings.getSettings()
+    const quota = type === 'premium' ? settings.quotaPremium : settings.quotaStandard
+    const estVendeuse = req.user.coursiere?.estVendeuse
+    const prix = type === 'premium'
+      ? (estVendeuse ? settings.unitePrixPremiumVendeuse : settings.unitePrixPremiumNonVendeuse)
+      : (estVendeuse ? settings.unitePrixStandardVendeuse : settings.unitePrixStandardNonVendeuse)
     const expiration = new Date()
     expiration.setHours(23, 59, 59, 999)
 
@@ -71,7 +79,7 @@ router.put('/unites', proteger, autoriser('coursiere'), async (req, res) => {
       'coursiere.typeProfile': type,
       'coursiere.statut': 'disponible'
     })
-    res.json({ succes: true, message: 'Unités activées' })
+    res.json({ succes: true, message: 'Unités activées', quota, prix })
   } catch (err) {
     res.status(500).json({ succes: false, message: err.message })
   }

@@ -1,5 +1,6 @@
 const Transaction = require('../models/Transaction')
 const Course = require('../models/Course')
+const { getIO } = require('../socket')
 
 exports.creerTransaction = async (req, res) => {
   try {
@@ -7,6 +8,13 @@ exports.creerTransaction = async (req, res) => {
 
     const course = await Course.findById(courseId)
     if (!course) return res.status(404).json({ succes: false, message: 'Course introuvable' })
+
+    if (course.client.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ succes: false, message: 'Accès refusé' })
+    }
+    if (course.paiementEffectue) {
+      return res.status(400).json({ succes: false, message: 'Cette course a déjà été payée' })
+    }
 
     const transaction = await Transaction.create({
       course: courseId,
@@ -16,7 +24,7 @@ exports.creerTransaction = async (req, res) => {
       budgetCourses: course.budgetCourses || 0,
       fraisPrestation: course.fraisPrestation || 0,
       fraisLivraison: course.fraisLivraison || 0,
-      fraisService: 200,
+      fraisService: course.fraisService || 200,
       methodePaiement: methodePaiement || 'wave',
       statut: 'complete',
       referenceWave: 'WAVE_' + Date.now()
@@ -25,6 +33,8 @@ exports.creerTransaction = async (req, res) => {
     course.paiementEffectue = true
     course.statut = 'en_cours'
     await course.save()
+
+    getIO()?.to(course._id.toString()).emit('statut_change', { course })
 
     res.status(201).json({ succes: true, transaction })
   } catch (err) {

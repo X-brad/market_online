@@ -189,14 +189,24 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useToastStore } from '../stores/toast'
+import api from '../api/axios.js'
 
 const toast = useToastStore()
 const activeStep = ref(0)
 const hoveredMarche = ref(null)
 const showModal = ref(false)
 const modalAction = ref('')
+
+onMounted(async () => {
+  try {
+    const res = await api.get('/marches', { params: { actif: true } })
+    if (res.data.marches.length > 0) marches.value = res.data.marches
+  } catch (err) {
+    console.error('Erreur marchés:', err)
+  }
+})
 
 function ouvrirModal(action) {
   modalAction.value = action
@@ -236,14 +246,14 @@ const steps = [
   }
 ]
 
-const marches = [
+const marches = ref([
   { nom: 'Marché de Cocody', commune: 'Cocody', icon: '🏪' },
   { nom: 'Cocovico', commune: 'Cocody', icon: '🛒' },
   { nom: "Marché d'Adjamé", commune: 'Adjamé', icon: '🏪' },
   { nom: 'Marché de Treichville', commune: 'Treichville', icon: '🛒' },
   { nom: 'Marché de Koumassi', commune: 'Koumassi', icon: '🏪' },
   { nom: 'Marché de Bingerville', commune: 'Bingerville', icon: '🛒' }
-]
+])
 
 const profiles = [
   {

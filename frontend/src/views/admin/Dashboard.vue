@@ -44,9 +44,6 @@
             <span class="stat-icon">{{ s.icon }}</span>
             <p class="stat-val">{{ s.val }}</p>
             <p class="stat-label">{{ s.label }}</p>
-            <p class="stat-trend" :class="s.trend > 0 ? 'up' : 'down'">
-              {{ s.trend > 0 ? '↑' : '↓' }} {{ Math.abs(s.trend) }}% ce mois
-            </p>
           </div>
         </div>
 
@@ -161,11 +158,11 @@
               <div class="tarif-group" v-for="t in tarifs" :key="t.label">
                 <label>{{ t.label }}</label>
                 <div class="tarif-input-row">
-                  <input v-model.number="t.valeur" type="number" class="tarif-input" />
+                  <input v-model.number="parametres[t.key]" type="number" class="tarif-input" />
                   <span>F CFA / jour</span>
                 </div>
               </div>
-              <button class="btn-save" @click="sauvegarderTarifs">💾 Sauvegarder les tarifs</button>
+              <button class="btn-save" @click="sauvegarderParametres">💾 Sauvegarder les tarifs</button>
             </div>
           </div>
           <div class="card">
@@ -175,11 +172,11 @@
               <div class="tarif-group" v-for="q in quotas" :key="q.label">
                 <label>{{ q.label }}</label>
                 <div class="tarif-input-row">
-                  <input v-model.number="q.valeur" type="number" class="tarif-input" />
+                  <input v-model.number="parametres[q.key]" type="number" class="tarif-input" />
                   <span>courses / jour</span>
                 </div>
               </div>
-              <button class="btn-save" @click="sauvegarderQuotas">💾 Sauvegarder les quotas</button>
+              <button class="btn-save" @click="sauvegarderParametres">💾 Sauvegarder les quotas</button>
             </div>
           </div>
         </div>
@@ -190,11 +187,11 @@
             <div class="tarif-group">
               <label>Frais de service par commande</label>
               <div class="tarif-input-row">
-                <input v-model.number="fraisService" type="number" class="tarif-input" />
+                <input v-model.number="parametres.fraisService" type="number" class="tarif-input" />
                 <span>F CFA</span>
               </div>
             </div>
-            <button class="btn-save" @click="sauvegarderFrais">💾 Sauvegarder</button>
+            <button class="btn-save" @click="sauvegarderParametres">💾 Sauvegarder</button>
           </div>
         </div>
       </div>
@@ -204,17 +201,17 @@
         <div class="stats-grid" style="grid-template-columns: repeat(3,1fr)">
           <div class="stat-card green">
             <span class="stat-icon">💰</span>
-            <p class="stat-val">284 500 F</p>
+            <p class="stat-val">{{ statsTransactions.revenus }} F</p>
             <p class="stat-label">Revenus totaux</p>
           </div>
           <div class="stat-card blue">
             <span class="stat-icon">🔄</span>
-            <p class="stat-val">142</p>
-            <p class="stat-label">Transactions ce mois</p>
+            <p class="stat-val">{{ statsTransactions.total }}</p>
+            <p class="stat-label">Transactions complétées</p>
           </div>
           <div class="stat-card amber">
             <span class="stat-icon">⏳</span>
-            <p class="stat-val">3</p>
+            <p class="stat-val">{{ transactions.filter(t => t.statut === 'pending').length }}</p>
             <p class="stat-label">En attente</p>
           </div>
         </div>
@@ -233,18 +230,18 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="t in transactions" :key="t.id">
-                <td><span class="tx-id">#{{ t.id }}</span></td>
-                <td>{{ t.client }}</td>
-                <td>{{ t.coursiere }}</td>
-                <td><strong>{{ t.montant }} F</strong></td>
-                <td class="frais-cell">+{{ t.frais }} F</td>
+              <tr v-for="t in transactions" :key="t._id">
+                <td><span class="tx-id">#{{ t._id.slice(-6) }}</span></td>
+                <td>{{ t.client?.prenom }} {{ t.client?.nom }}</td>
+                <td>{{ t.coursiere ? `${t.coursiere.prenom} ${t.coursiere.nom}` : '—' }}</td>
+                <td><strong>{{ t.montantTotal }} F</strong></td>
+                <td class="frais-cell">+{{ t.fraisService }} F</td>
                 <td>
                   <span class="tx-badge" :class="t.statut">
                     {{ t.statut === 'complete' ? '✓ Complété' : t.statut === 'pending' ? '⏳ En attente' : '✗ Échoué' }}
                   </span>
                 </td>
-                <td>{{ t.date }}</td>
+                <td>{{ new Date(t.createdAt).toLocaleDateString('fr-FR') }}</td>
               </tr>
             </tbody>
           </table>
@@ -254,26 +251,25 @@
       <!-- LITIGES -->
       <div v-if="activeMenu === 'litiges'" class="content">
         <div class="litiges-list">
-          <div class="card litige-card" v-for="l in litiges" :key="l.id">
+          <div class="card litige-card" v-for="l in litiges" :key="l._id">
             <div class="litige-header">
               <span class="litige-icon">⚠️</span>
               <div>
                 <p class="litige-title">{{ l.titre }}</p>
-                <span class="litige-date">{{ l.date }}</span>
+                <span class="litige-date">{{ new Date(l.createdAt).toLocaleDateString('fr-FR') }}</span>
               </div>
               <span class="litige-badge" :class="l.statut">
                 {{ l.statut === 'ouvert' ? 'Ouvert' : 'Résolu' }}
               </span>
             </div>
-            <p class="litige-desc">{{ l.desc }}</p>
+            <p class="litige-desc">{{ l.description }}</p>
             <div class="litige-parties">
-              <span>👤 {{ l.client }}</span>
+              <span>👤 {{ l.client?.prenom }} {{ l.client?.nom }}</span>
               <span>→</span>
-              <span>👩🏾 {{ l.coursiere }}</span>
+              <span>👩🏾 {{ l.coursiere ? `${l.coursiere.prenom} ${l.coursiere.nom}` : '—' }}</span>
             </div>
             <div class="litige-actions" v-if="l.statut === 'ouvert'">
               <button class="btn-sm green" @click="resoudreLitige(l)">✓ Marquer résolu</button>
-              <button class="btn-sm gray">💬 Contacter les parties</button>
             </div>
           </div>
           <div class="empty-state" v-if="litiges.length === 0">
@@ -286,7 +282,7 @@
       <!-- MARCHÉS -->
       <div v-if="activeMenu === 'marches'" class="content">
         <div class="marches-admin-grid">
-          <div class="card marche-admin-card" v-for="m in marchesAdmin" :key="m.nom">
+          <div class="card marche-admin-card" v-for="m in marchesAdmin" :key="m.id">
             <div class="marche-admin-header">
               <span class="marche-admin-icon">{{ m.icon }}</span>
               <div>
@@ -294,14 +290,14 @@
                 <span>📍 {{ m.commune }}</span>
               </div>
               <label class="toggle-switch">
-                <input type="checkbox" v-model="m.actif" />
+                <input type="checkbox" :checked="m.actif" @change="toggleMarche(m)" />
                 <span class="toggle-slider"></span>
               </label>
             </div>
             <div class="marche-admin-stats">
               <div><p>{{ m.coursieres }}</p><span>Coursières</span></div>
               <div><p>{{ m.coursesJour }}</p><span>Courses/jour</span></div>
-              <div><p>{{ m.note }}</p><span>Note moy.</span></div>
+              <div><p>{{ m.note ?? '—' }}</p><span>Note moy.</span></div>
             </div>
           </div>
         </div>
@@ -345,40 +341,39 @@ const menus = [
 
 const menuActif = computed(() => menus.find(m => m.id === activeMenu.value))
 
-const statsGlobales = ref([
-  { icon: '👩🏾', val: '24', label: 'Coursières actives', trend: 12, color: 'green' },
-  { icon: '👤', val: '89', label: 'Clients inscrits', trend: 8, color: 'blue' },
-  { icon: '🛒', val: '142', label: 'Courses ce mois', trend: 23, color: 'amber' },
-  { icon: '💰', val: '284 500 F', label: 'Revenus totaux', trend: 18, color: 'green' },
-  { icon: '⭐', val: '4.7', label: 'Note moyenne', trend: 2, color: 'blue' },
-  { icon: '⚠️', val: '2', label: 'Litiges ouverts', trend: -1, color: 'red' }
+const stats = ref({})
+const litiges = ref([])
+const transactions = ref([])
+const statsTransactions = ref({ revenus: 0, total: 0 })
+const marchesAdmin = ref([])
+const coursieres = ref([])
+const parametres = ref({
+  unitePrixStandardVendeuse: 500,
+  unitePrixStandardNonVendeuse: 600,
+  unitePrixPremiumVendeuse: 1000,
+  unitePrixPremiumNonVendeuse: 600,
+  quotaStandard: 10,
+  quotaPremium: 15,
+  fraisService: 200
+})
+
+const statsGlobales = computed(() => [
+  { icon: '👩🏾', val: String(stats.value.coursieresDispo ?? 0), label: 'Coursières disponibles', color: 'green' },
+  { icon: '👤', val: String(stats.value.totalClients ?? 0), label: 'Clients inscrits', color: 'blue' },
+  { icon: '🛒', val: String(stats.value.totalCourses ?? 0), label: 'Courses totales', color: 'amber' },
+  { icon: '✅', val: String(stats.value.coursesLivrees ?? 0), label: 'Courses livrées', color: 'green' },
+  { icon: '💰', val: `${stats.value.revenus ?? 0} F`, label: 'Revenus totaux', color: 'green' },
+  { icon: '⚠️', val: String(litiges.value.filter(l => l.statut === 'ouvert').length), label: 'Litiges ouverts', color: 'red' }
 ])
 
-const activites = ref([
-  { id: 1, type: 'success', text: 'Nouvelle coursière inscrite — Fatou D.', time: 'Il y a 5 min' },
-  { id: 2, type: 'payment', text: 'Transaction reçue — 8 500 F CFA', time: 'Il y a 12 min' },
-  { id: 3, type: 'warning', text: 'Litige signalé — Commande #142', time: 'Il y a 34 min' },
-  { id: 4, type: 'success', text: 'Course complétée — Marché Adjamé', time: 'Il y a 1h' },
-  { id: 5, type: 'payment', text: 'Transaction reçue — 12 200 F CFA', time: 'Il y a 2h' }
-])
+const activites = computed(() => transactions.value.slice(0, 5).map(t => ({
+  id: t._id,
+  type: 'payment',
+  text: `Transaction reçue — ${t.montantTotal} F CFA (${t.client?.prenom || ''} ${t.client?.nom || ''})`,
+  time: new Date(t.createdAt).toLocaleString('fr-FR')
+})))
 
-const marchesStats = ref([
-  { nom: 'Marché d\'Adjamé', commune: 'Adjamé', icon: '🏪', coursieres: 8 },
-  { nom: 'Marché de Cocody', commune: 'Cocody', icon: '🛒', coursieres: 6 },
-  { nom: 'Cocovico', commune: 'Cocody', icon: '🏪', coursieres: 4 },
-  { nom: 'Marché de Treichville', commune: 'Treichville', icon: '🛒', coursieres: 3 },
-  { nom: 'Marché de Koumassi', commune: 'Koumassi', icon: '🏪', coursieres: 2 },
-  { nom: 'Marché de Bingerville', commune: 'Bingerville', icon: '🛒', coursieres: 1 }
-])
-
-const coursieres = ref([
-  { id: 1, nom: 'Amara Koné', initiales: 'AK', telephone: '07 01 02 03', marche: 'Adjamé', type: 'Premium', statut: 'disponible', note: 4.9, courses: 127, validee: true },
-  { id: 2, nom: 'Fatou Diallo', initiales: 'FD', telephone: '05 04 05 06', marche: 'Cocody', type: 'Standard', statut: 'disponible', note: 4.7, courses: 89, validee: true },
-  { id: 3, nom: 'Binta Ouédraogo', initiales: 'BO', telephone: '07 07 08 09', marche: 'Adjamé', type: 'Premium', statut: 'occupee', note: 4.8, courses: 203, validee: true },
-  { id: 4, nom: 'Mariama Traoré', initiales: 'MT', telephone: '01 10 11 12', marche: 'Koumassi', type: 'Standard', statut: 'hors_ligne', note: 4.6, courses: 54, validee: false },
-  { id: 5, nom: 'Awa Coulibaly', initiales: 'AC', telephone: '05 13 14 15', marche: 'Treichville', type: 'Standard', statut: 'hors_ligne', note: 0, courses: 0, validee: false }
-])
-
+const marchesStats = computed(() => marchesAdmin.value.slice(0, 6))
 
 const filtresCoursiere = [
   { val: 'tous', label: 'Toutes' },
@@ -398,42 +393,17 @@ const coursieresFiltrees = computed(() => {
   })
 })
 
-const tarifs = ref([
-  { label: 'Standard — Vendeuse', valeur: 500 },
-  { label: 'Standard — Non-vendeuse', valeur: 600 },
-  { label: 'Premium — Vendeuse', valeur: 1000 },
-  { label: 'Premium — Non-vendeuse', valeur: 600 }
-])
+const tarifs = [
+  { label: 'Standard — Vendeuse', key: 'unitePrixStandardVendeuse' },
+  { label: 'Standard — Non-vendeuse', key: 'unitePrixStandardNonVendeuse' },
+  { label: 'Premium — Vendeuse', key: 'unitePrixPremiumVendeuse' },
+  { label: 'Premium — Non-vendeuse', key: 'unitePrixPremiumNonVendeuse' }
+]
 
-const quotas = ref([
-  { label: 'Coursière Standard', valeur: 10 },
-  { label: 'Coursière Premium', valeur: 15 }
-])
-
-const fraisService = ref(200)
-
-const transactions = ref([
-  { id: '001', client: 'Konan A.', coursiere: 'Amara K.', montant: 8500, frais: 200, statut: 'complete', date: '07/07/2026' },
-  { id: '002', client: 'Diaby M.', coursiere: 'Fatou D.', montant: 12200, frais: 200, statut: 'complete', date: '07/07/2026' },
-  { id: '003', client: 'Yao K.', coursiere: 'Binta O.', montant: 6800, frais: 200, statut: 'pending', date: '07/07/2026' },
-  { id: '004', client: 'Touré S.', coursiere: 'Amara K.', montant: 9400, frais: 200, statut: 'complete', date: '06/07/2026' },
-  { id: '005', client: 'N\'Guessan P.', coursiere: 'Mariama T.', montant: 5200, frais: 200, statut: 'failed', date: '06/07/2026' }
-])
-
-const litiges = ref([
-  { id: 1, titre: 'Produit manquant dans la livraison', date: '07/07/2026', statut: 'ouvert', desc: 'Le client signale que le poisson commandé n\'était pas dans la livraison.', client: 'Konan A.', coursiere: 'Amara K.' },
-  { id: 2, titre: 'Retard de livraison excessif', date: '06/07/2026', statut: 'ouvert', desc: 'Livraison reçue 3h après l\'heure prévue sans notification.', client: 'Yao K.', coursiere: 'Fatou D.' }
-])
-
-const marchesAdmin = ref([
-  { nom: 'Marché d\'Adjamé', commune: 'Adjamé', icon: '🏪', actif: true, coursieres: 8, coursesJour: 24, note: '4.8' },
-  { nom: 'Marché de Cocody', commune: 'Cocody', icon: '🛒', actif: true, coursieres: 6, coursesJour: 18, note: '4.7' },
-  { nom: 'Cocovico', commune: 'Cocody', icon: '🏪', actif: true, coursieres: 4, coursesJour: 12, note: '4.6' },
-  { nom: 'Marché de Treichville', commune: 'Treichville', icon: '🛒', actif: true, coursieres: 3, coursesJour: 9, note: '4.5' },
-  { nom: 'Marché de Koumassi', commune: 'Koumassi', icon: '🏪', actif: true, coursieres: 2, coursesJour: 6, note: '4.4' },
-  { nom: 'Marché de Bingerville', commune: 'Bingerville', icon: '🛒', actif: false, coursieres: 0, coursesJour: 0, note: '—' }
-])
-
+const quotas = [
+  { label: 'Coursière Standard', key: 'quotaStandard' },
+  { label: 'Coursière Premium', key: 'quotaPremium' }
+]
 
 function showToast(msg, type = 'success') {
   toastMsg.value = msg
@@ -441,35 +411,127 @@ function showToast(msg, type = 'success') {
   setTimeout(() => toastMsg.value = '', 3000)
 }
 
-function validerCoursiere(c) {
-  c.validee = true
-  showToast(`✓ ${c.nom} validée avec succès`)
+async function chargerStats() {
+  try {
+    const res = await api.get('/admin/stats')
+    stats.value = res.data.stats
+  } catch (err) {
+    console.error('Erreur stats:', err)
+  }
 }
 
-function suspendreCoursiere(c) {
-  c.statut = 'hors_ligne'
-  showToast(`🚫 ${c.nom} suspendue`, 'warning')
+async function chargerCoursieres() {
+  try {
+    const res = await api.get('/admin/coursieres')
+    coursieres.value = res.data.coursieres
+  } catch (err) {
+    console.error('Erreur coursières:', err)
+  }
+}
+
+async function chargerTransactions() {
+  try {
+    const [resTx, resStats] = await Promise.all([
+      api.get('/admin/transactions'),
+      api.get('/transactions/stats')
+    ])
+    transactions.value = resTx.data.transactions
+    statsTransactions.value = resStats.data.stats
+  } catch (err) {
+    console.error('Erreur transactions:', err)
+  }
+}
+
+async function chargerLitiges() {
+  try {
+    const res = await api.get('/litiges')
+    litiges.value = res.data.litiges
+  } catch (err) {
+    console.error('Erreur litiges:', err)
+  }
+}
+
+async function chargerMarches() {
+  try {
+    const res = await api.get('/marches/stats')
+    marchesAdmin.value = res.data.marches
+  } catch (err) {
+    console.error('Erreur marchés:', err)
+  }
+}
+
+async function chargerParametres() {
+  try {
+    const res = await api.get('/admin/parametres')
+    parametres.value = res.data.parametres
+  } catch (err) {
+    console.error('Erreur paramètres:', err)
+  }
+}
+
+onMounted(() => {
+  chargerStats()
+  chargerCoursieres()
+  chargerTransactions()
+  chargerLitiges()
+  chargerMarches()
+  chargerParametres()
+})
+
+async function validerCoursiere(c) {
+  try {
+    await api.put(`/admin/coursieres/${c.id}/valider`)
+    c.valide = true
+    showToast(`✓ ${c.nom} validée avec succès`)
+  } catch (err) {
+    showToast('Erreur lors de la validation', 'warning')
+  }
+}
+
+async function suspendreCoursiere(c) {
+  try {
+    await api.put(`/admin/coursieres/${c.id}/suspendre`)
+    c.statut = 'hors_ligne'
+    c.actif = false
+    showToast(`🚫 ${c.nom} suspendue`, 'warning')
+  } catch (err) {
+    showToast('Erreur lors de la suspension', 'warning')
+  }
 }
 
 function voirCoursiere(c) {
   showToast(`👁 Profil de ${c.nom} — à venir`)
 }
 
-function sauvegarderTarifs() {
-  showToast('💾 Tarifs mis à jour avec succès')
+async function sauvegarderParametres() {
+  try {
+    const res = await api.put('/admin/parametres', parametres.value)
+    parametres.value = res.data.parametres
+    showToast('💾 Paramètres mis à jour avec succès')
+  } catch (err) {
+    showToast('Erreur lors de la sauvegarde', 'warning')
+  }
 }
 
-function sauvegarderQuotas() {
-  showToast('💾 Quotas mis à jour avec succès')
+async function resoudreLitige(l) {
+  try {
+    await api.put(`/litiges/${l._id}/resoudre`)
+    l.statut = 'resolu'
+    showToast('✓ Litige marqué comme résolu')
+  } catch (err) {
+    showToast('Erreur lors de la résolution', 'warning')
+  }
 }
 
-function sauvegarderFrais() {
-  showToast('💾 Frais de service mis à jour')
-}
-
-function resoudreLitige(l) {
-  l.statut = 'resolu'
-  showToast('✓ Litige marqué comme résolu')
+async function toggleMarche(m) {
+  const nouveauActif = !m.actif
+  try {
+    await api.put(`/marches/${m.id}`, { actif: nouveauActif })
+    m.actif = nouveauActif
+    showToast(`${m.nom} ${nouveauActif ? 'activé' : 'désactivé'}`)
+  } catch (err) {
+    showToast('Erreur lors de la mise à jour du marché', 'warning')
+  }
 }
 </script>
 
@@ -511,9 +573,6 @@ function resoudreLitige(l) {
 .stat-icon { font-size: 24px; display: block; margin-bottom: 10px; }
 .stat-val { font-size: 22px; font-weight: 800; color: var(--texte); margin: 0 0 4px; }
 .stat-label { font-size: 12px; color: var(--texte-sec); margin: 0 0 6px; }
-.stat-trend { font-size: 11px; font-weight: 600; margin: 0; }
-.stat-trend.up { color: var(--vert); }
-.stat-trend.down { color: #ef4444; }
 
 /* TWO COL */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }

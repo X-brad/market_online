@@ -10,12 +10,14 @@ const {
   noterCoursiere,
   statsAdmin
 } = require('../controllers/courseController')
+const { messagesDeCourse } = require('../controllers/messageController')
 const { proteger, autoriser } = require('../middleware/auth')
 
 router.post('/', proteger, autoriser('client'), creerCourse)
 router.get('/mes-courses', proteger, mesCourses)
 router.get('/disponibles', proteger, autoriser('coursiere'), coursesDisponibles)
 router.get('/stats', proteger, autoriser('admin'), statsAdmin)
+router.get('/:id/messages', proteger, messagesDeCourse)
 router.put('/:id/accepter', proteger, autoriser('coursiere'), accepterCourse)
 router.put('/:id/statut', proteger, mettreAJourStatut)
 router.put('/:id/devis', proteger, autoriser('coursiere'), proposerDevis)

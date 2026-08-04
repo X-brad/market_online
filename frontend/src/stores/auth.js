@@ -24,6 +24,11 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user')
   }
 
+  function mettreAJourUser(champs) {
+    user.value = { ...user.value, ...champs }
+    localStorage.setItem('user', JSON.stringify(user.value))
+  }
+
   function getDashboardRoute() {
     const role = user.value?.role
     if (role === 'client') return '/client/dashboard'
@@ -32,5 +37,5 @@ export const useAuthStore = defineStore('auth', () => {
     return '/'
   }
 
-  return { token, user, estConnecte, estClient, estCoursiere, estAdmin, connecter, deconnecter, getDashboardRoute }
+  return { token, user, estConnecte, estClient, estCoursiere, estAdmin, connecter, deconnecter, mettreAJourUser, getDashboardRoute }
 })

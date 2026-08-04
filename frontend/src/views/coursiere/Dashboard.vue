@@ -55,32 +55,25 @@
       </div>
 
       <!-- NOTIFICATION NOUVELLE COURSE -->
-      <div class="nouvelle-course" v-if="nouvelleCourse">
+      <div class="nouvelle-course" v-if="nouvelleCourseData">
         <div class="course-header">
           <span class="course-ping"></span>
           <h3>Nouvelle course disponible !</h3>
           <span class="course-timer">⏱ {{ timer }}s</span>
         </div>
-        <div class="course-details">
+        <div class="course-details two">
           <div class="course-detail">
             <span>🏪</span>
             <div>
-              <p>{{ nouvelleCourse.marche }}</p>
-              <p>{{ nouvelleCourse.commune }}</p>
+              <p>{{ nouvelleCourseData.marche }}</p>
+              <p>{{ nouvelleCourseData.commune }}</p>
             </div>
           </div>
           <div class="course-detail">
-            <span>📍</span>
+            <span>📋</span>
             <div>
-              <p>{{ nouvelleCourse.distance }}</p>
-              <p>Distance</p>
-            </div>
-          </div>
-          <div class="course-detail">
-            <span>💰</span>
-            <div>
-              <p>{{ nouvelleCourse.gain }} F CFA</p>
-              <p>Gain estimé</p>
+              <p>{{ (nouvelleCourseData.liste || '').slice(0, 36) }}{{ (nouvelleCourseData.liste || '').length > 36 ? '…' : '' }}</p>
+              <p>Liste de courses</p>
             </div>
           </div>
         </div>
@@ -96,9 +89,10 @@
           <span>🛒</span>
           <div>
             <h3>Course en cours</h3>
-            <p>{{ courseEnCours.marche }} · Client : {{ courseEnCours.client }}</p>
+            <p>{{ courseEnCours.marche }} · Client : {{ clientNom }}</p>
           </div>
-          <span class="encours-badge">En cours</span>
+          <span class="encours-badge" v-if="!paiementRecu">En cours</span>
+          <span class="encours-badge paye" v-else>✅ Payé</span>
         </div>
         <div class="liste-courses">
           <p class="liste-title">📋 Liste du client :</p>
@@ -127,7 +121,7 @@
               </div>
               <div class="histo-right">
                 <p class="histo-gain">+{{ h.gain }} F</p>
-                <div class="histo-note">⭐ {{ h.note }}</div>
+                <div class="histo-note">{{ h.note ? `⭐ ${h.note}` : '—' }}</div>
               </div>
             </div>
             <p class="empty" v-if="historique.length === 0">Aucune course pour l'instant</p>
@@ -147,19 +141,19 @@
           <div class="profil-items">
             <div class="profil-item">
               <span>Type de profil</span>
-              <span class="profil-badge standard">Standard</span>
+              <span class="profil-badge" :class="typeProfile.toLowerCase()">{{ typeProfile }}</span>
             </div>
             <div class="profil-item">
               <span>Note moyenne</span>
-              <span>⭐ 0.0</span>
+              <span>⭐ {{ noteMoyenne }}</span>
             </div>
             <div class="profil-item">
               <span>Courses totales</span>
-              <span>0</span>
+              <span>{{ historique.length }}</span>
             </div>
             <div class="profil-item">
               <span>Statut validation</span>
-              <span class="profil-badge pending">En attente</span>
+              <span class="profil-badge" :class="estValidee ? 'standard' : 'pending'">{{ estValidee ? '✓ Validée' : 'En attente' }}</span>
             </div>
           </div>
         </div>
@@ -196,32 +190,94 @@
       </div>
     </div>
 
+    <!-- MODALE TCHAT -->
+    <div class="modal-overlay" v-if="showTchat && courseEnCours" @click.self="showTchat = false">
+      <div class="modal tchat-modal">
+        <button class="modal-close" @click="showTchat = false">✕</button>
+        <div class="tchat-card">
+          <div class="tchat-header">
+            <div class="coursiere-avatar sm">{{ clientInitiales }}</div>
+            <div class="tchat-header-info">
+              <p class="tchat-nom">{{ clientNom }}</p>
+              <p class="tchat-statut"><span class="dot-green"></span> {{ courseEnCours.marche }}</p>
+            </div>
+            <span class="paiement-badge" v-if="paiementRecu">✅ Payé</span>
+          </div>
+          <div class="quick-actions">
+            <button class="quick-btn" @click="showDevisForm = !showDevisForm">💰 Proposer un devis</button>
+          </div>
+          <div class="devis-form" v-if="showDevisForm">
+            <input v-model.number="devisForm.budgetCourses" type="number" placeholder="Budget courses estimé (F CFA)" />
+            <input v-model.number="devisForm.fraisLivraison" type="number" placeholder="Frais de livraison (F CFA)" />
+            <button class="btn-envoyer-devis" :disabled="!devisForm.budgetCourses || !devisForm.fraisLivraison" @click="envoyerDevis">Envoyer le devis</button>
+          </div>
+          <div class="tchat-messages" ref="messagesEl">
+            <div v-for="(msg, i) in messages" :key="i" class="message" :class="msg.from">
+              <div v-if="msg.type === 'liste'" class="bubble liste-bubble">
+                <div class="liste-bubble-header">📋 Liste de courses</div>
+                <div class="liste-bubble-content">{{ msg.text }}</div>
+              </div>
+              <div v-else-if="msg.type === 'devis'" class="bubble devis-bubble">
+                <div class="devis-bubble-header">💰 Devis envoyé</div>
+                <div class="devis-line"><span>Frais prestation</span><strong>{{ msg.devis.prestation }} F</strong></div>
+                <div class="devis-line"><span>Frais livraison</span><strong>{{ msg.devis.livraison }} F</strong></div>
+                <div class="devis-total"><span>Total frais</span><strong>{{ msg.devis.prestation + msg.devis.livraison }} F</strong></div>
+              </div>
+              <div v-else class="bubble">{{ msg.text }}</div>
+              <span class="msg-time">{{ msg.time }}</span>
+            </div>
+          </div>
+          <div class="tchat-input">
+            <input v-model="nouveauMsg" placeholder="Écrire un message..." @keyup.enter="envoyerMessage" />
+            <button class="btn-send" @click="envoyerMessage" :disabled="!nouveauMsg.trim()"><span>➤</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import api from '../../api/axios.js'
+import socket from '../../api/socket.js'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import { useToastStore } from '../../stores/toast'
 
 const authStore = useAuthStore()
-const statut = ref('hors_ligne')
-const unitesActives = ref(false)
-const coursesAujourdhui = ref(0)
-const quotaJournalier = ref(10)
+const toast = useToastStore()
+
+const statut = ref(authStore.user?.coursiere?.statut || 'hors_ligne')
+const unitesActives = ref(authStore.user?.coursiere?.unitesActives || false)
+const coursesAujourdhui = ref(authStore.user?.coursiere?.coursesAujourdhui || 0)
+const quotaJournalier = ref(authStore.user?.coursiere?.quotaJournalier || 10)
 const showUnites = ref(false)
 const showTchat = ref(false)
 const uniteChoisie = ref('Standard')
 const timer = ref(25)
-const nouvelleCourse = ref(null)
+const nouvelleCourseData = ref(null)
 const courseEnCours = ref(null)
 let timerInterval = null
+
+const typeProfile = computed(() => authStore.user?.coursiere?.typeProfile === 'premium' ? 'Premium' : 'Standard')
+const estValidee = computed(() => !!authStore.user?.coursiere?.valide)
+const noteMoyenne = computed(() => {
+  const c = authStore.user?.coursiere
+  return c?.nombreAvis > 0 ? Math.round(c.note / c.nombreAvis * 10) / 10 : '—'
+})
 
 const initiales = computed(() => {
   const u = authStore.user
   if (!u) return '?'
   return (u.prenom?.[0] || '') + (u.nom?.[0] || '')
+})
 
-
+const clientNom = computed(() => courseEnCours.value?.client ? `${courseEnCours.value.client.prenom} ${courseEnCours.value.client.nom}` : '')
+const clientInitiales = computed(() => {
+  const c = courseEnCours.value?.client
+  if (!c) return '?'
+  return (c.prenom?.[0] || '') + (c.nom?.[0] || '')
 })
 
 const stats = ref([
@@ -232,83 +288,247 @@ const stats = ref([
 ])
 
 const historique = ref([])
+const mesCoursesRaw = ref([])
 
 const unitesOptions = [
   { type: 'Standard', icon: '⭐', prix: 500, quota: 10 },
   { type: 'Premium', icon: '💎', prix: 1000, quota: 15 }
 ]
 
-function toggleStatut() {
+async function chargerProfil() {
+  try {
+    const res = await api.get('/auth/moi')
+    authStore.mettreAJourUser({ coursiere: res.data.user.coursiere, actif: res.data.user.actif })
+    statut.value = authStore.user.coursiere?.statut || 'hors_ligne'
+    unitesActives.value = authStore.user.coursiere?.unitesActives || false
+    coursesAujourdhui.value = authStore.user.coursiere?.coursesAujourdhui || 0
+    quotaJournalier.value = authStore.user.coursiere?.quotaJournalier || 10
+  } catch (err) {
+    console.error('Erreur profil:', err)
+  }
+}
+
+function recalculerStats() {
+  const aujourdhui = new Date().toDateString()
+  const debutMois = new Date()
+  debutMois.setDate(1)
+  debutMois.setHours(0, 0, 0, 0)
+
+  const livrees = mesCoursesRaw.value.filter(c => c.statut === 'livree')
+  const gain = (c) => (c.fraisPrestation || 0) + (c.fraisLivraison || 0)
+
+  const livreesAujourdhui = livrees.filter(c => new Date(c.createdAt).toDateString() === aujourdhui)
+  const livreesMois = livrees.filter(c => new Date(c.createdAt) >= debutMois)
+  const revenusJour = livreesAujourdhui.reduce((acc, c) => acc + gain(c), 0)
+
+  stats.value[0].val = String(livreesAujourdhui.length)
+  stats.value[1].val = `${revenusJour} F`
+  stats.value[2].val = String(noteMoyenne.value)
+  stats.value[3].val = String(livreesMois.length)
+
+  historique.value = livrees
+    .slice()
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 10)
+    .map(c => ({
+      id: c._id,
+      marche: c.marche,
+      date: new Date(c.createdAt).toLocaleDateString('fr-FR'),
+      gain: gain(c),
+      note: c.noteClient || null
+    }))
+}
+
+async function chargerHistorique() {
+  try {
+    const res = await api.get('/courses/mes-courses')
+    mesCoursesRaw.value = res.data.courses
+    recalculerStats()
+  } catch (err) {
+    console.error('Erreur historique:', err)
+  }
+}
+
+onMounted(async () => {
+  await chargerProfil()
+  await chargerHistorique()
+
+  socket.connect()
+  socket.on('nouvelle_course', (course) => {
+    if (nouvelleCourseData.value || courseEnCours.value) return
+    if (statut.value !== 'disponible' || !unitesActives.value) return
+    if (coursesAujourdhui.value >= quotaJournalier.value) return
+    nouvelleCourseData.value = course
+    startTimer()
+  })
+})
+
+onUnmounted(() => {
+  clearInterval(timerInterval)
+  socket.off('nouvelle_course')
+  socket.off('nouveau_message')
+  socket.off('devis_propose')
+  socket.off('statut_change')
+  if (socket.connected) socket.disconnect()
+})
+
+async function toggleStatut() {
   if (!unitesActives.value) {
     showUnites.value = true
     return
   }
-  statut.value = statut.value === 'disponible' ? 'hors_ligne' : 'disponible'
+  const nouveauStatut = statut.value === 'disponible' ? 'hors_ligne' : 'disponible'
+  try {
+    await api.put('/coursiere/statut', { statut: nouveauStatut })
+    statut.value = nouveauStatut
+  } catch (err) {
+    toast.error('Erreur lors du changement de statut')
+  }
 }
 
-function acheterUnites() {
-  unitesActives.value = true
-  quotaJournalier.value = uniteChoisie.value === 'Premium' ? 15 : 10
-  statut.value = 'disponible'
-  showUnites.value = false
-
-  // Simuler une nouvelle course après 3 secondes
-  setTimeout(() => {
-    if (statut.value === 'disponible') {
-      nouvelleCourse.value = {
-        marche: 'Marché Adjamé',
-        commune: 'Adjamé',
-        distance: '1.2 km',
-        gain: 1200
-      }
-      startTimer()
-    }
-  }, 3000)
+async function acheterUnites() {
+  try {
+    const res = await api.put('/coursiere/unites', { type: uniteChoisie.value })
+    unitesActives.value = true
+    quotaJournalier.value = res.data.quota || (uniteChoisie.value === 'Premium' ? 15 : 10)
+    statut.value = 'disponible'
+    showUnites.value = false
+    toast.success('Unités activées, vous êtes maintenant disponible !')
+    chargerProfil()
+  } catch (err) {
+    toast.error('Erreur lors de l\'achat des unités')
+  }
 }
 
 function startTimer() {
   timer.value = 25
+  clearInterval(timerInterval)
   timerInterval = setInterval(() => {
     timer.value--
     if (timer.value <= 0) {
       clearInterval(timerInterval)
-      nouvelleCourse.value = null
+      nouvelleCourseData.value = null
     }
   }, 1000)
 }
 
-function accepterCourse() {
+async function accepterCourse() {
   clearInterval(timerInterval)
-  courseEnCours.value = {
-    marche: nouvelleCourse.value.marche,
-    client: 'Konan A.',
-    liste: '1 kg de tomates, 2 ignames, poisson maquereau 500g, gombos, oignons'
+  const course = nouvelleCourseData.value
+  nouvelleCourseData.value = null
+  try {
+    const res = await api.put(`/courses/${course._id}/accepter`)
+    courseEnCours.value = res.data.course
+    coursesAujourdhui.value++
+    paiementRecu.value = false
+    messages.value = []
+    devisForm.value = { budgetCourses: null, fraisLivraison: null }
+    showDevisForm.value = false
+
+    socket.emit('rejoindre_course', courseEnCours.value._id)
+    socket.off('nouveau_message')
+    socket.off('devis_propose')
+    socket.off('statut_change')
+
+    socket.on('nouveau_message', (msg) => {
+      messages.value.push(formaterMessage(msg))
+      scrollBottom()
+    })
+
+    socket.on('devis_propose', ({ course }) => {
+      messages.value.push({
+        from: 'coursiere',
+        type: 'devis',
+        devis: { prestation: course.fraisPrestation, livraison: course.fraisLivraison },
+        time: getTime()
+      })
+      scrollBottom()
+    })
+
+    socket.on('statut_change', ({ course }) => {
+      if (course.paiementEffectue) paiementRecu.value = true
+    })
+
+    toast.success('Course acceptée ! Vous pouvez contacter le client.')
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Cette course n\'est plus disponible')
   }
-  nouvelleCourse.value = null
-  coursesAujourdhui.value++
-  stats.value[0].val = coursesAujourdhui.value.toString()
 }
 
 function refuserCourse() {
   clearInterval(timerInterval)
-  nouvelleCourse.value = null
+  nouvelleCourseData.value = null
 }
 
-function terminerCourse() {
-  stats.value[1].val = (parseInt(stats.value[1].val) + 1200) + ' F'
-  stats.value[3].val = (parseInt(stats.value[3].val) + 1).toString()
-  historique.value.unshift({
-    id: Date.now(),
-    marche: courseEnCours.value.marche,
-    date: 'Aujourd\'hui',
-    gain: 1200,
-    note: 5.0
+const messages = ref([])
+const messagesEl = ref(null)
+const nouveauMsg = ref('')
+const paiementRecu = ref(false)
+const devisForm = ref({ budgetCourses: null, fraisLivraison: null })
+const showDevisForm = ref(false)
+
+function getTime(date) {
+  return new Date(date || Date.now()).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function scrollBottom() {
+  nextTick(() => {
+    if (messagesEl.value) messagesEl.value.scrollTop = messagesEl.value.scrollHeight
   })
-  courseEnCours.value = null
 }
 
-onUnmounted(() => clearInterval(timerInterval))
+function formaterMessage(msg) {
+  return {
+    from: msg.expediteur === authStore.user?.id ? 'coursiere' : 'client',
+    text: msg.texte,
+    type: msg.type,
+    devis: msg.devis,
+    time: getTime(msg.createdAt)
+  }
+}
 
+async function envoyerMessage() {
+  if (!nouveauMsg.value.trim()) return
+  const texte = nouveauMsg.value
+  nouveauMsg.value = ''
+  try {
+    await api.post('/messages', {
+      course: courseEnCours.value._id,
+      texte,
+      type: 'normal'
+    })
+  } catch (err) {
+    toast.error('Erreur lors de l\'envoi du message')
+  }
+}
+
+async function envoyerDevis() {
+  try {
+    const res = await api.put(`/courses/${courseEnCours.value._id}/devis`, {
+      budgetCourses: devisForm.value.budgetCourses,
+      fraisLivraison: devisForm.value.fraisLivraison
+    })
+    showDevisForm.value = false
+    toast.success(`Devis envoyé : ${res.data.fraisPrestation} F de frais de prestation`)
+  } catch (err) {
+    toast.error('Erreur lors de l\'envoi du devis')
+  }
+}
+
+async function terminerCourse() {
+  try {
+    await api.put(`/courses/${courseEnCours.value._id}/statut`, { statut: 'livree' })
+    toast.success('Livraison marquée comme terminée !')
+    showTchat.value = false
+    courseEnCours.value = null
+    socket.off('nouveau_message')
+    socket.off('devis_propose')
+    socket.off('statut_change')
+    chargerHistorique()
+  } catch (err) {
+    toast.error('Erreur lors de la validation de la livraison')
+  }
+}
 </script>
 
 <style scoped>
@@ -356,6 +576,7 @@ onUnmounted(() => clearInterval(timerInterval))
 .course-header h3 { font-size: 16px; font-weight: 800; color: var(--texte); flex: 1; margin: 0; }
 .course-timer { font-size: 14px; font-weight: 700; color: #dc2626; }
 .course-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.course-details.two { grid-template-columns: repeat(2, 1fr); }
 .course-detail { display: flex; align-items: center; gap: 8px; background: var(--fond); border-radius: 10px; padding: 10px; }
 .course-detail span:first-child { font-size: 20px; }
 .course-detail p:first-child { font-size: 13px; font-weight: 600; margin: 0 0 2px; color: var(--texte); }
@@ -371,6 +592,7 @@ onUnmounted(() => clearInterval(timerInterval))
 .encours-header h3 { font-size: 16px; font-weight: 700; margin: 0 0 2px; }
 .encours-header p { font-size: 13px; color: var(--texte-sec); margin: 0; }
 .encours-badge { margin-left: auto; background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.encours-badge.paye { background: #dcfce7; color: #166534; }
 .liste-courses { background: var(--fond); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
 .liste-title { font-size: 13px; font-weight: 700; margin: 0 0 6px; color: var(--texte); }
 .liste-content { font-size: 13px; color: var(--texte-sec); margin: 0; line-height: 1.6; }
@@ -404,13 +626,14 @@ onUnmounted(() => clearInterval(timerInterval))
 .profil-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--texte-sec); }
 .profil-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
 .profil-badge.standard { background: var(--vert-light); color: var(--vert-dark); }
+.profil-badge.premium { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; }
 .profil-badge.pending { background: #fef3c7; color: #92400e; }
 
 /* MODALE */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 24px; backdrop-filter: blur(4px); }
 .modal { background: white; border-radius: 20px; padding: 36px; max-width: 420px; width: 100%; text-align: center; position: relative; box-shadow: 0 24px 60px rgba(0,0,0,0.2); animation: modalIn 0.25s ease; }
 @keyframes modalIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-.modal-close { position: absolute; top: 16px; right: 16px; background: var(--fond); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 14px; color: var(--texte-sec); }
+.modal-close { position: absolute; top: 16px; right: 16px; background: var(--fond); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 14px; color: var(--texte-sec); z-index: 1; }
 .modal-icon { font-size: 44px; margin-bottom: 16px; display: block; }
 .modal h3 { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
 .modal p { font-size: 14px; color: var(--texte-sec); margin-bottom: 24px; }
@@ -423,4 +646,44 @@ onUnmounted(() => clearInterval(timerInterval))
 .unite-quota { font-size: 11px; color: var(--texte-sec); margin: 0; }
 .btn-payer-unite { width: 100%; padding: 14px; background: #1d4ed8; color: white; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
 .btn-payer-unite:hover { background: #1e40af; }
+
+/* TCHAT MODAL */
+.tchat-modal { max-width: 480px; text-align: left; padding: 0; overflow: hidden; }
+.tchat-card { display: flex; flex-direction: column; height: 620px; }
+.tchat-header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 0.5px solid var(--bordure); background: white; }
+.coursiere-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--vert); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.coursiere-avatar.sm { width: 36px; height: 36px; font-size: 13px; }
+.tchat-header-info { flex: 1; }
+.tchat-nom { font-size: 15px; font-weight: 700; margin: 0 0 2px; color: var(--texte); }
+.tchat-statut { font-size: 12px; color: var(--texte-sec); margin: 0; display: flex; align-items: center; gap: 5px; }
+.dot-green { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; display: inline-block; }
+.paiement-badge { background: #dcfce7; color: #166534; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.quick-actions { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 0.5px solid var(--bordure); flex-wrap: wrap; background: var(--fond); }
+.quick-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--bordure); background: white; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--texte); transition: all 0.2s; }
+.quick-btn:hover { border-color: var(--vert); color: var(--vert); background: var(--vert-light); }
+.devis-form { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 0.5px solid var(--bordure); flex-wrap: wrap; background: var(--vert-light); }
+.devis-form input { flex: 1; min-width: 140px; padding: 8px 12px; border: 1px solid var(--bordure); border-radius: var(--radius); font-size: 13px; }
+.btn-envoyer-devis { background: var(--vert); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn-envoyer-devis:disabled { opacity: 0.5; cursor: not-allowed; }
+.tchat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #f8faf9; }
+.message { display: flex; flex-direction: column; }
+.message.coursiere { align-items: flex-end; }
+.message.client { align-items: flex-start; }
+.bubble { max-width: 78%; padding: 10px 14px; border-radius: 16px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.message.coursiere .bubble { background: var(--vert); color: white; border-bottom-right-radius: 4px; }
+.message.client .bubble { background: white; color: var(--texte); border: 0.5px solid var(--bordure); border-bottom-left-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.msg-time { font-size: 10px; color: var(--texte-sec); margin-top: 4px; padding: 0 4px; }
+.liste-bubble { background: white !important; border: 1.5px solid var(--vert) !important; padding: 0 !important; overflow: hidden; min-width: 220px; }
+.liste-bubble-header { background: var(--vert); color: white; padding: 8px 14px; font-size: 12px; font-weight: 700; }
+.liste-bubble-content { padding: 10px 14px; font-size: 13px; color: var(--texte); white-space: pre-wrap; line-height: 1.6; }
+.devis-bubble { background: white !important; border: 1.5px solid #f59e0b !important; padding: 0 !important; overflow: hidden; min-width: 220px; }
+.devis-bubble-header { background: #f59e0b; color: white; padding: 8px 14px; font-size: 12px; font-weight: 700; }
+.devis-line { display: flex; justify-content: space-between; padding: 8px 14px 0; font-size: 13px; color: var(--texte-sec); }
+.devis-line strong { color: var(--texte); }
+.devis-total { display: flex; justify-content: space-between; padding: 8px 14px; font-size: 14px; font-weight: 700; color: var(--texte); border-top: 0.5px solid var(--bordure); margin-top: 6px; }
+.tchat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 0.5px solid var(--bordure); align-items: center; background: white; }
+.tchat-input input { flex: 1; padding: 10px 16px; border: 1px solid var(--bordure); border-radius: 24px; font-size: 13px; background: var(--fond); color: var(--texte); }
+.tchat-input input:focus { border-color: var(--vert); outline: none; }
+.btn-send { background: var(--vert); color: white; border: none; border-radius: 50%; width: 38px; height: 38px; font-size: 15px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>
