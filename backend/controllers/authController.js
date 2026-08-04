@@ -7,15 +7,17 @@ exports.inscription = async (req, res) => {
   try {
     const { nom, prenom, pseudo, telephone, email, motDePasse, role, commune, coursiere } = req.body
 
-    const existeDeja = await User.findOne({
-      $or: [{ telephone }, { pseudo: pseudo?.toLowerCase() }]
-    })
+    const conditions = [{ telephone }]
+    if (pseudo) conditions.push({ pseudo: pseudo.toLowerCase() })
+
+    const existeDeja = await User.findOne({ $or: conditions })
     if (existeDeja) {
       return res.status(400).json({ succes: false, message: 'Ce numéro ou pseudo est déjà utilisé' })
     }
 
-    const userData = { nom, prenom, pseudo, telephone, email, motDePasse, role, commune }
-    if (role === 'coursiere' && coursiere) userData.coursiere = coursiere
+    const roleAutorise = role === 'coursiere' ? 'coursiere' : 'client'
+    const userData = { nom, prenom, pseudo, telephone, email, motDePasse, role: roleAutorise, commune }
+    if (roleAutorise === 'coursiere' && coursiere) userData.coursiere = coursiere
 
     const user = await User.create(userData)
     const token = genererToken(user._id)
