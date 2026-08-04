@@ -7,7 +7,9 @@ const SettingsSchema = new mongoose.Schema({
   unitePrixPremiumNonVendeuse: { type: Number, default: 600 },
   quotaStandard: { type: Number, default: 10 },
   quotaPremium: { type: Number, default: 15 },
-  fraisService: { type: Number, default: 200 }
+  fraisService: { type: Number, default: 200 },
+  prixPremiumClient: { type: Number, default: 2000 },
+  dureePremiumJours: { type: Number, default: 30 }
 }, { timestamps: true })
 
 async function getSettings() {

@@ -10,6 +10,10 @@ const UserSchema = new mongoose.Schema({
   motDePasse: { type: String, required: true, minlength: 6, select: false },
   role: { type: String, enum: ['client', 'coursiere', 'admin'], default: 'client' },
   commune: { type: String, required: true },
+  premium: {
+    actif: { type: Boolean, default: false },
+    expiration: { type: Date, default: null }
+  },
   coursiere: {
     typeProfile: { type: String, enum: ['standard', 'premium'], default: 'standard' },
     estVendeuse: { type: Boolean, default: false },
@@ -21,7 +25,12 @@ const UserSchema = new mongoose.Schema({
     quotaJournalier: { type: Number, default: 10 },
     note: { type: Number, default: 0 },
     nombreAvis: { type: Number, default: 0 },
-    valide: { type: Boolean, default: false }
+    valide: { type: Boolean, default: false },
+    position: {
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null },
+      misAJourLe: { type: Date, default: null }
+    }
   },
   actif: { type: Boolean, default: true }
 }, { timestamps: true })

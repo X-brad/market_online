@@ -66,6 +66,24 @@ const CourseSchema = new mongoose.Schema({
   commentaireClient: {
     type: String,
     default: ''
+  },
+  dispatching: {
+    candidats: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    indexActuel: { type: Number, default: 0 }
+  },
+  livraison: {
+    statut: {
+      type: String,
+      enum: ['non_demandee', 'proposee', 'acceptee', 'commandee'],
+      default: 'non_demandee'
+    },
+    livreurNom: { type: String, default: '' },
+    livreurTelephone: { type: String, default: '' },
+    adresseLivraison: { type: String, default: '' },
+    dureeRecuperation: { type: String, default: '' },
+    dureeLivraison: { type: String, default: '' },
+    prix: { type: Number, default: 0 },
+    proposeeLe: { type: Date, default: null }
   }
 }, { timestamps: true })
 

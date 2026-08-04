@@ -76,4 +76,26 @@ const remove = toastStore.remove
   from { opacity: 1; transform: translateX(0); }
   to { opacity: 0; transform: translateX(40px); }
 }
+
+/* MOBILE : en haut de l'écran, compact, pour ne jamais recouvrir les
+   actions principales qui sont presque toujours en bas de page ici */
+@media (max-width: 640px) {
+  .toast-container {
+    top: 12px;
+    bottom: auto;
+    left: 12px;
+    right: 12px;
+    gap: 8px;
+  }
+  .toast { min-width: 0; max-width: none; padding: 10px 12px; font-size: 13px; }
+  .toast-icon { font-size: 15px; }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes toastOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-20px); }
+  }
+}
 </style>

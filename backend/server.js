@@ -23,6 +23,7 @@ app.use('/api/transactions', require('./routes/transactions'))
 app.use('/api/messages', require('./routes/messages'))
 app.use('/api/litiges', require('./routes/litiges'))
 app.use('/api/marches', require('./routes/marches'))
+app.use('/api/parametres', require('./routes/parametres'))
 
 app.get('/', (req, res) => {
   res.json({ message: 'MamiMarché API ✅' })
@@ -36,6 +37,12 @@ io.on('connection', (socket) => {
   socket.on('rejoindre_course', (courseId) => {
     socket.join(courseId)
     console.log(`📦 Socket ${socket.id} a rejoint la room ${courseId}`)
+  })
+
+  // Rejoindre sa room personnelle de coursière (pour recevoir les propositions ciblées du dispatching)
+  socket.on('rejoindre_coursiere', (coursiereId) => {
+    socket.join('coursiere_' + coursiereId)
+    console.log(`👩🏾 Socket ${socket.id} a rejoint la room coursiere_${coursiereId}`)
   })
 
   // Déconnexion

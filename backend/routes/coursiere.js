@@ -3,6 +3,7 @@ const router = express.Router()
 const { proteger, autoriser } = require('../middleware/auth')
 const User = require('../models/User')
 const Settings = require('../models/Settings')
+const Course = require('../models/Course')
 const { getIO } = require('../socket')
 
 // GET /api/coursiere/disponibles
@@ -54,6 +55,28 @@ router.put('/statut', proteger, autoriser('coursiere'), async (req, res) => {
     await User.findByIdAndUpdate(req.user._id, { 'coursiere.statut': statut })
     getIO()?.emit('coursiere_statut_change', { userId: req.user._id, statut })
     res.json({ succes: true, message: 'Statut mis à jour' })
+  } catch (err) {
+    res.status(500).json({ succes: false, message: err.message })
+  }
+})
+
+// PUT /api/coursiere/position — mise à jour de la position GPS live
+router.put('/position', proteger, autoriser('coursiere'), async (req, res) => {
+  try {
+    const { lat, lng } = req.body
+    await User.findByIdAndUpdate(req.user._id, {
+      'coursiere.position': { lat, lng, misAJourLe: new Date() }
+    })
+
+    const courseActive = await Course.findOne({
+      coursiere: req.user._id,
+      statut: { $in: ['assignee', 'en_cours'] }
+    })
+    if (courseActive) {
+      getIO()?.to(courseActive._id.toString()).emit('position_maj', { lat, lng })
+    }
+
+    res.json({ succes: true })
   } catch (err) {
     res.status(500).json({ succes: false, message: err.message })
   }

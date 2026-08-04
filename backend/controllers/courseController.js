@@ -4,6 +4,13 @@
 const User = require('../models/User')
 const Settings = require('../models/Settings')
 const { getIO } = require('../socket')
+const { demarrerDispatching, passerAuSuivant, annulerMinuteur } = require('../services/dispatching')
+
+async function coursesAujourdhui(coursiereId) {
+  const debutJour = new Date()
+  debutJour.setHours(0, 0, 0, 0)
+  return Course.countDocuments({ coursiere: coursiereId, createdAt: { $gte: debutJour } })
+}
 
 // POST /api/courses — Créer une course
 exports.creerCourse = async (req, res) => {
@@ -18,7 +25,8 @@ exports.creerCourse = async (req, res) => {
       mode: mode || 'standard'
     })
 
-    getIO()?.emit('nouvelle_course', course)
+    // Laisse au client le temps de rejoindre la room de la course avant le premier envoi
+    setTimeout(() => demarrerDispatching(course._id), 500)
 
     res.status(201).json({ succes: true, course })
   } catch (err) {
@@ -72,25 +80,55 @@ exports.accepterCourse = async (req, res) => {
       return res.status(400).json({ succes: false, message: 'Cette course n\'est plus disponible' })
     }
 
-    // Vérifier quota journalier
+    // Vérifier que c'est bien la candidate actuellement ciblée par le dispatching
+    const candidatActuel = course.dispatching?.candidats?.[course.dispatching.indexActuel]
+    if (candidatActuel && candidatActuel.toString() !== req.user._id.toString()) {
+      return res.status(400).json({ succes: false, message: 'Cette course n\'est plus disponible' })
+    }
+
+    // Vérifier quota journalier (calculé en direct, pas un compteur qui ne se remet jamais à zéro)
     const coursiere = await User.findById(req.user._id)
-    if (coursiere.coursiere.coursesAujourdhui >= coursiere.coursiere.quotaJournalier) {
+    const dejaAujourdhui = await coursesAujourdhui(req.user._id)
+    if (dejaAujourdhui >= coursiere.coursiere.quotaJournalier) {
       return res.status(400).json({ succes: false, message: 'Quota journalier atteint' })
     }
+
+    annulerMinuteur(course._id)
 
     course.coursiere = req.user._id
     course.statut = 'assignee'
     await course.save()
 
-    // Incrémenter courses du jour
+    // Incrémenter courses du jour (compteur d'affichage)
     await User.findByIdAndUpdate(req.user._id, {
       $inc: { 'coursiere.coursesAujourdhui': 1 }
     })
 
     await course.populate('coursiere', 'nom prenom telephone')
+    await course.populate('client', 'nom prenom telephone')
     getIO()?.to(course._id.toString()).emit('course_assignee', { course })
 
     res.json({ succes: true, course })
+  } catch (err) {
+    res.status(500).json({ succes: false, message: err.message })
+  }
+}
+
+// PUT /api/courses/:id/refuser — Coursière refuse la course qui lui est proposée
+exports.refuserCourse = async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id)
+    if (!course) return res.status(404).json({ succes: false, message: 'Course introuvable' })
+
+    const candidatActuel = course.dispatching?.candidats?.[course.dispatching.indexActuel]
+    if (!candidatActuel || candidatActuel.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ succes: false, message: 'Cette course ne vous est pas proposée' })
+    }
+
+    annulerMinuteur(course._id)
+    await passerAuSuivant(course._id)
+
+    res.json({ succes: true })
   } catch (err) {
     res.status(500).json({ succes: false, message: err.message })
   }
@@ -121,31 +159,81 @@ exports.mettreAJourStatut = async (req, res) => {
   }
 }
 
-// PUT /api/courses/:id/devis — Coursière propose un devis
-exports.proposerDevis = async (req, res) => {
+// PUT /api/courses/:id/budget — Client fixe son budget de courses
+exports.validerBudget = async (req, res) => {
   try {
-    const { fraisLivraison, budgetCourses } = req.body
+    const { budgetCourses } = req.body
     const course = await Course.findById(req.params.id)
 
     if (!course) return res.status(404).json({ succes: false, message: 'Course introuvable' })
 
-    if (!course.coursiere || course.coursiere.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ succes: false, message: 'Vous n\'êtes pas assignée à cette course' })
+    if (course.client.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ succes: false, message: 'Accès refusé' })
     }
 
     const settings = await Settings.getSettings()
     const fraisPrestation = calculerFraisPrestation(budgetCourses)
 
-    course.fraisPrestation = fraisPrestation
-    course.fraisLivraison = fraisLivraison
     course.budgetCourses = budgetCourses
+    course.fraisPrestation = fraisPrestation
     course.fraisService = settings.fraisService
-    course.totalPaye = budgetCourses + fraisPrestation + fraisLivraison + settings.fraisService
+    course.totalPaye = budgetCourses + fraisPrestation + settings.fraisService
     await course.save()
 
-    getIO()?.to(course._id.toString()).emit('devis_propose', { course })
+    getIO()?.to(course._id.toString()).emit('budget_valide', { course })
 
     res.json({ succes: true, course, fraisPrestation })
+  } catch (err) {
+    res.status(400).json({ succes: false, message: err.message })
+  }
+}
+
+// PUT /api/courses/:id/livraison — Livraison via Yango Moto (proposer/accepter/refuser/commander)
+exports.gererLivraison = async (req, res) => {
+  try {
+    const { action, livreurNom, livreurTelephone, adresseLivraison, dureeRecuperation, dureeLivraison, prix } = req.body
+    const course = await Course.findById(req.params.id)
+
+    if (!course) return res.status(404).json({ succes: false, message: 'Course introuvable' })
+
+    const estClient = course.client.toString() === req.user._id.toString()
+    const estCoursiere = course.coursiere && course.coursiere.toString() === req.user._id.toString()
+    if (!estClient && !estCoursiere) {
+      return res.status(403).json({ succes: false, message: 'Accès refusé' })
+    }
+
+    if (action === 'proposer') {
+      if (!estCoursiere) return res.status(403).json({ succes: false, message: 'Accès refusé' })
+      if (!course.paiementEffectue) {
+        return res.status(400).json({ succes: false, message: 'Le paiement du client est requis avant de proposer une livraison' })
+      }
+      course.livraison = {
+        statut: 'proposee',
+        livreurNom, livreurTelephone, adresseLivraison, dureeRecuperation, dureeLivraison,
+        prix: prix || 0,
+        proposeeLe: new Date()
+      }
+      course.fraisLivraison = prix || 0
+    } else if (action === 'accepter') {
+      if (!estClient) return res.status(403).json({ succes: false, message: 'Accès refusé' })
+      course.livraison.statut = 'acceptee'
+    } else if (action === 'refuser') {
+      if (!estClient) return res.status(403).json({ succes: false, message: 'Accès refusé' })
+      course.livraison.statut = 'non_demandee'
+    } else if (action === 'commander') {
+      if (!estCoursiere) return res.status(403).json({ succes: false, message: 'Accès refusé' })
+      if (course.livraison.statut !== 'acceptee') {
+        return res.status(400).json({ succes: false, message: 'Le client doit d\'abord accepter la proposition' })
+      }
+      course.livraison.statut = 'commandee'
+    } else {
+      return res.status(400).json({ succes: false, message: 'Action invalide' })
+    }
+
+    await course.save()
+    getIO()?.to(course._id.toString()).emit('livraison_maj', { course })
+
+    res.json({ succes: true, course })
   } catch (err) {
     res.status(400).json({ succes: false, message: err.message })
   }

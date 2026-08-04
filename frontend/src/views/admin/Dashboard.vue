@@ -194,6 +194,27 @@
             <button class="btn-save" @click="sauvegarderParametres">💾 Sauvegarder</button>
           </div>
         </div>
+        <div class="card">
+          <h3>⭐ Abonnement premium client</h3>
+          <p class="card-desc">Permet à un client de choisir une autre commune que la sienne pour ses courses</p>
+          <div class="tarif-form" style="max-width: 300px;">
+            <div class="tarif-group">
+              <label>Prix de l'abonnement</label>
+              <div class="tarif-input-row">
+                <input v-model.number="parametres.prixPremiumClient" type="number" class="tarif-input" />
+                <span>F CFA</span>
+              </div>
+            </div>
+            <div class="tarif-group">
+              <label>Durée de l'abonnement</label>
+              <div class="tarif-input-row">
+                <input v-model.number="parametres.dureePremiumJours" type="number" class="tarif-input" />
+                <span>jours</span>
+              </div>
+            </div>
+            <button class="btn-save" @click="sauvegarderParametres">💾 Sauvegarder</button>
+          </div>
+        </div>
       </div>
 
       <!-- TRANSACTIONS -->
@@ -354,7 +375,9 @@ const parametres = ref({
   unitePrixPremiumNonVendeuse: 600,
   quotaStandard: 10,
   quotaPremium: 15,
-  fraisService: 200
+  fraisService: 200,
+  prixPremiumClient: 2000,
+  dureePremiumJours: 30
 })
 
 const statsGlobales = computed(() => [

@@ -33,7 +33,7 @@
             <span class="unites-icon">{{ unitesActives ? '✅' : '⚠️' }}</span>
             <div>
               <p class="unites-title">{{ unitesActives ? 'Unités actives aujourd\'hui' : 'Aucune unité active' }}</p>
-              <p class="unites-sub">{{ unitesActives ? `Quota : ${coursesAujourdhui}/${quotaJournalier} courses` : 'Achetez des unités pour recevoir des courses' }}</p>
+              <p class="unites-sub">{{ unitesActives ? `Quota : ${coursesAujourdhuiCalcule}/${quotaJournalier} courses` : 'Achetez des unités pour recevoir des courses' }}</p>
             </div>
           </div>
           <button class="btn-unites" @click="showUnites = true">
@@ -100,7 +100,7 @@
         </div>
         <div class="encours-actions">
           <button class="btn-tchat" @click="showTchat = true">💬 Contacter le client</button>
-          <button class="btn-terminer" @click="terminerCourse">Livraison effectuée ✓</button>
+          <button class="btn-terminer" :disabled="livraisonData?.statut !== 'commandee'" @click="terminerCourse">Livraison effectuée ✓</button>
         </div>
       </div>
 
@@ -203,25 +203,48 @@
             </div>
             <span class="paiement-badge" v-if="paiementRecu">✅ Payé</span>
           </div>
-          <div class="quick-actions">
-            <button class="quick-btn" @click="showDevisForm = !showDevisForm">💰 Proposer un devis</button>
+          <div class="quick-actions" v-if="paiementRecu">
+            <button
+              class="quick-btn"
+              v-if="(!livraisonData || livraisonData.statut === 'non_demandee') && !showRechercheForm"
+              @click="showRechercheForm = true"
+            >🔍 Rechercher un livreur Yango</button>
+            <span class="livraison-etat" v-else-if="livraisonData?.statut === 'proposee'">⏳ En attente de la réponse du client...</span>
+            <button class="quick-btn" v-else-if="livraisonData?.statut === 'acceptee'" @click="commanderLivraison">✅ Confirmer la réservation</button>
+            <span class="livraison-etat" v-else-if="livraisonData?.statut === 'commandee'">🛵 Livreur commandé</span>
           </div>
-          <div class="devis-form" v-if="showDevisForm">
-            <input v-model.number="devisForm.budgetCourses" type="number" placeholder="Budget courses estimé (F CFA)" />
-            <input v-model.number="devisForm.fraisLivraison" type="number" placeholder="Frais de livraison (F CFA)" />
-            <button class="btn-envoyer-devis" :disabled="!devisForm.budgetCourses || !devisForm.fraisLivraison" @click="envoyerDevis">Envoyer le devis</button>
+
+          <div class="yango-recherche" v-if="showRechercheForm">
+            <div class="yango-form" v-if="!candidatsLivreurs.length && !rechercheEnCours">
+              <input v-model="adresseRecherche" type="text" placeholder="Adresse de livraison (indiquée par le client)" />
+              <button class="btn-envoyer-devis" :disabled="!adresseRecherche.trim()" @click="rechercherLivreurs">🔍 Lancer la recherche</button>
+              <button class="btn-fermer-recherche" @click="showRechercheForm = false">Annuler</button>
+            </div>
+
+            <div class="recherche-chargement" v-if="rechercheEnCours">
+              <div class="spinner-sm"></div>
+              <p>Recherche de livreurs disponibles...</p>
+            </div>
+
+            <div class="candidats-livreurs" v-if="candidatsLivreurs.length && !rechercheEnCours">
+              <div class="candidat-livreur" v-for="(c, i) in candidatsLivreurs" :key="i">
+                <div class="candidat-info">
+                  <p class="candidat-nom">{{ c.livreurNom }} <span class="candidat-note">⭐ {{ c.note }}</span></p>
+                  <p class="candidat-detail">{{ c.dureeRecuperation }} récup. · {{ c.dureeLivraison }} livraison</p>
+                </div>
+                <div class="candidat-prix">
+                  <strong>{{ c.prix }} F</strong>
+                  <button class="btn-choisir-livreur" @click="choisirLivreur(c)">Choisir</button>
+                </div>
+              </div>
+              <button class="btn-relancer-recherche" @click="candidatsLivreurs = []">🔄 Relancer la recherche</button>
+            </div>
           </div>
           <div class="tchat-messages" ref="messagesEl">
             <div v-for="(msg, i) in messages" :key="i" class="message" :class="msg.from">
               <div v-if="msg.type === 'liste'" class="bubble liste-bubble">
                 <div class="liste-bubble-header">📋 Liste de courses</div>
                 <div class="liste-bubble-content">{{ msg.text }}</div>
-              </div>
-              <div v-else-if="msg.type === 'devis'" class="bubble devis-bubble">
-                <div class="devis-bubble-header">💰 Devis envoyé</div>
-                <div class="devis-line"><span>Frais prestation</span><strong>{{ msg.devis.prestation }} F</strong></div>
-                <div class="devis-line"><span>Frais livraison</span><strong>{{ msg.devis.livraison }} F</strong></div>
-                <div class="devis-total"><span>Total frais</span><strong>{{ msg.devis.prestation + msg.devis.livraison }} F</strong></div>
               </div>
               <div v-else class="bubble">{{ msg.text }}</div>
               <span class="msg-time">{{ msg.time }}</span>
@@ -250,7 +273,6 @@ const toast = useToastStore()
 
 const statut = ref(authStore.user?.coursiere?.statut || 'hors_ligne')
 const unitesActives = ref(authStore.user?.coursiere?.unitesActives || false)
-const coursesAujourdhui = ref(authStore.user?.coursiere?.coursesAujourdhui || 0)
 const quotaJournalier = ref(authStore.user?.coursiere?.quotaJournalier || 10)
 const showUnites = ref(false)
 const showTchat = ref(false)
@@ -290,6 +312,11 @@ const stats = ref([
 const historique = ref([])
 const mesCoursesRaw = ref([])
 
+const coursesAujourdhuiCalcule = computed(() => {
+  const aujourdhui = new Date().toDateString()
+  return mesCoursesRaw.value.filter(c => new Date(c.createdAt).toDateString() === aujourdhui).length
+})
+
 const unitesOptions = [
   { type: 'Standard', icon: '⭐', prix: 500, quota: 10 },
   { type: 'Premium', icon: '💎', prix: 1000, quota: 15 }
@@ -301,7 +328,6 @@ async function chargerProfil() {
     authStore.mettreAJourUser({ coursiere: res.data.user.coursiere, actif: res.data.user.actif })
     statut.value = authStore.user.coursiere?.statut || 'hors_ligne'
     unitesActives.value = authStore.user.coursiere?.unitesActives || false
-    coursesAujourdhui.value = authStore.user.coursiere?.coursesAujourdhui || 0
     quotaJournalier.value = authStore.user.coursiere?.quotaJournalier || 10
   } catch (err) {
     console.error('Erreur profil:', err)
@@ -315,7 +341,7 @@ function recalculerStats() {
   debutMois.setHours(0, 0, 0, 0)
 
   const livrees = mesCoursesRaw.value.filter(c => c.statut === 'livree')
-  const gain = (c) => (c.fraisPrestation || 0) + (c.fraisLivraison || 0)
+  const gain = (c) => c.fraisPrestation || 0
 
   const livreesAujourdhui = livrees.filter(c => new Date(c.createdAt).toDateString() === aujourdhui)
   const livreesMois = livrees.filter(c => new Date(c.createdAt) >= debutMois)
@@ -349,25 +375,55 @@ async function chargerHistorique() {
   }
 }
 
+let watchIdPosition = null
+let dernierEnvoiPosition = 0
+
+function demarrerSuiviPosition() {
+  if (!navigator.geolocation || watchIdPosition !== null) return
+  watchIdPosition = navigator.geolocation.watchPosition(
+    (pos) => {
+      const maintenant = Date.now()
+      if (maintenant - dernierEnvoiPosition < 15000) return
+      dernierEnvoiPosition = maintenant
+      api.put('/coursiere/position', {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      }).catch(() => {})
+    },
+    () => {},
+    { enableHighAccuracy: true, maximumAge: 10000 }
+  )
+}
+
+function arreterSuiviPosition() {
+  if (watchIdPosition !== null && navigator.geolocation) {
+    navigator.geolocation.clearWatch(watchIdPosition)
+    watchIdPosition = null
+  }
+}
+
 onMounted(async () => {
   await chargerProfil()
   await chargerHistorique()
 
   socket.connect()
-  socket.on('nouvelle_course', (course) => {
+  socket.emit('rejoindre_coursiere', authStore.user?.id)
+  socket.on('nouvelle_course', ({ course, expirationOffre }) => {
     if (nouvelleCourseData.value || courseEnCours.value) return
-    if (statut.value !== 'disponible' || !unitesActives.value) return
-    if (coursesAujourdhui.value >= quotaJournalier.value) return
+    if (statut.value !== 'disponible') return
     nouvelleCourseData.value = course
-    startTimer()
+    startTimer(expirationOffre)
   })
+
+  if (statut.value === 'disponible') demarrerSuiviPosition()
 })
 
 onUnmounted(() => {
   clearInterval(timerInterval)
+  arreterSuiviPosition()
   socket.off('nouvelle_course')
   socket.off('nouveau_message')
-  socket.off('devis_propose')
+  socket.off('livraison_maj')
   socket.off('statut_change')
   if (socket.connected) socket.disconnect()
 })
@@ -381,6 +437,8 @@ async function toggleStatut() {
   try {
     await api.put('/coursiere/statut', { statut: nouveauStatut })
     statut.value = nouveauStatut
+    if (nouveauStatut === 'disponible') demarrerSuiviPosition()
+    else arreterSuiviPosition()
   } catch (err) {
     toast.error('Erreur lors du changement de statut')
   }
@@ -394,22 +452,25 @@ async function acheterUnites() {
     statut.value = 'disponible'
     showUnites.value = false
     toast.success('Unités activées, vous êtes maintenant disponible !')
+    demarrerSuiviPosition()
     chargerProfil()
   } catch (err) {
     toast.error('Erreur lors de l\'achat des unités')
   }
 }
 
-function startTimer() {
-  timer.value = 25
+function startTimer(expirationOffre) {
   clearInterval(timerInterval)
-  timerInterval = setInterval(() => {
-    timer.value--
-    if (timer.value <= 0) {
+  const tick = () => {
+    const restant = Math.max(0, Math.ceil((expirationOffre - Date.now()) / 1000))
+    timer.value = restant
+    if (restant <= 0) {
       clearInterval(timerInterval)
       nouvelleCourseData.value = null
     }
-  }, 1000)
+  }
+  tick()
+  timerInterval = setInterval(tick, 1000)
 }
 
 async function accepterCourse() {
@@ -419,15 +480,18 @@ async function accepterCourse() {
   try {
     const res = await api.put(`/courses/${course._id}/accepter`)
     courseEnCours.value = res.data.course
-    coursesAujourdhui.value++
+    chargerHistorique()
     paiementRecu.value = false
     messages.value = []
-    devisForm.value = { budgetCourses: null, fraisLivraison: null }
-    showDevisForm.value = false
+    livraisonData.value = null
+    showRechercheForm.value = false
+    adresseRecherche.value = ''
+    rechercheEnCours.value = false
+    candidatsLivreurs.value = []
 
     socket.emit('rejoindre_course', courseEnCours.value._id)
     socket.off('nouveau_message')
-    socket.off('devis_propose')
+    socket.off('livraison_maj')
     socket.off('statut_change')
 
     socket.on('nouveau_message', (msg) => {
@@ -435,14 +499,10 @@ async function accepterCourse() {
       scrollBottom()
     })
 
-    socket.on('devis_propose', ({ course }) => {
-      messages.value.push({
-        from: 'coursiere',
-        type: 'devis',
-        devis: { prestation: course.fraisPrestation, livraison: course.fraisLivraison },
-        time: getTime()
-      })
-      scrollBottom()
+    socket.on('livraison_maj', ({ course }) => {
+      livraisonData.value = course.livraison
+      if (course.livraison.statut === 'acceptee') toast.success('Le client a accepté la livraison !')
+      if (course.livraison.statut === 'non_demandee') toast.info('Le client souhaite un autre livreur.')
     })
 
     socket.on('statut_change', ({ course }) => {
@@ -455,17 +515,43 @@ async function accepterCourse() {
   }
 }
 
-function refuserCourse() {
+async function refuserCourse() {
   clearInterval(timerInterval)
+  const course = nouvelleCourseData.value
   nouvelleCourseData.value = null
+  if (!course) return
+  try {
+    await api.put(`/courses/${course._id}/refuser`)
+  } catch (err) {
+    // la course a peut-être déjà expiré ou été prise, rien à faire
+  }
 }
 
 const messages = ref([])
 const messagesEl = ref(null)
 const nouveauMsg = ref('')
 const paiementRecu = ref(false)
-const devisForm = ref({ budgetCourses: null, fraisLivraison: null })
-const showDevisForm = ref(false)
+const livraisonData = ref(null)
+const showRechercheForm = ref(false)
+const adresseRecherche = ref('')
+const rechercheEnCours = ref(false)
+const candidatsLivreurs = ref([])
+
+const PRENOMS_LIVREURS = ['Ibrahim', 'Moussa', 'Kader', 'Salif', 'Aboubakar', 'Issa', 'Drissa', 'Lassina']
+const NOMS_LIVREURS = ['Traoré', 'Diabaté', 'Koné', 'Ouattara', 'Bamba', 'Coulibaly', 'Sanogo']
+
+function genererLivreur() {
+  const prenom = PRENOMS_LIVREURS[Math.floor(Math.random() * PRENOMS_LIVREURS.length)]
+  const nom = NOMS_LIVREURS[Math.floor(Math.random() * NOMS_LIVREURS.length)]
+  return {
+    livreurNom: `${prenom} ${nom}`,
+    livreurTelephone: '07' + Math.floor(10000000 + Math.random() * 89999999),
+    dureeRecuperation: `${5 + Math.floor(Math.random() * 10)} min`,
+    dureeLivraison: `${15 + Math.floor(Math.random() * 20)} min`,
+    prix: 500 + Math.floor(Math.random() * 10) * 100,
+    note: (4 + Math.random() * 0.9).toFixed(1)
+  }
+}
 
 function getTime(date) {
   return new Date(date || Date.now()).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -502,27 +588,57 @@ async function envoyerMessage() {
   }
 }
 
-async function envoyerDevis() {
+let rechercheJeton = 0
+
+function rechercherLivreurs() {
+  if (!adresseRecherche.value.trim()) return
+  rechercheEnCours.value = true
+  candidatsLivreurs.value = []
+  const jeton = ++rechercheJeton
+  setTimeout(() => {
+    if (jeton !== rechercheJeton) return
+    candidatsLivreurs.value = [genererLivreur(), genererLivreur(), genererLivreur()]
+    rechercheEnCours.value = false
+  }, 1200)
+}
+
+async function choisirLivreur(candidat) {
   try {
-    const res = await api.put(`/courses/${courseEnCours.value._id}/devis`, {
-      budgetCourses: devisForm.value.budgetCourses,
-      fraisLivraison: devisForm.value.fraisLivraison
+    await api.put(`/courses/${courseEnCours.value._id}/livraison`, {
+      action: 'proposer',
+      ...candidat,
+      adresseLivraison: adresseRecherche.value
     })
-    showDevisForm.value = false
-    toast.success(`Devis envoyé : ${res.data.fraisPrestation} F de frais de prestation`)
+    showRechercheForm.value = false
+    candidatsLivreurs.value = []
+    adresseRecherche.value = ''
+    toast.success('Livreur proposé au client !')
   } catch (err) {
-    toast.error('Erreur lors de l\'envoi du devis')
+    toast.error(err.response?.data?.message || 'Erreur lors de la proposition du livreur')
+  }
+}
+
+async function commanderLivraison() {
+  try {
+    await api.put(`/courses/${courseEnCours.value._id}/livraison`, { action: 'commander' })
+    toast.success('Livreur commandé !')
+  } catch (err) {
+    toast.error('Erreur lors de la commande du livreur')
   }
 }
 
 async function terminerCourse() {
+  if (livraisonData.value?.statut !== 'commandee') {
+    toast.warning('Le livreur doit d\'abord être réservé')
+    return
+  }
   try {
     await api.put(`/courses/${courseEnCours.value._id}/statut`, { statut: 'livree' })
     toast.success('Livraison marquée comme terminée !')
     showTchat.value = false
     courseEnCours.value = null
     socket.off('nouveau_message')
-    socket.off('devis_propose')
+    socket.off('livraison_maj')
     socket.off('statut_change')
     chargerHistorique()
   } catch (err) {
@@ -599,6 +715,7 @@ async function terminerCourse() {
 .encours-actions { display: flex; gap: 10px; }
 .btn-tchat { padding: 12px 20px; border-radius: var(--radius); border: 1.5px solid var(--vert); background: white; color: var(--vert); font-size: 14px; font-weight: 600; cursor: pointer; }
 .btn-terminer { flex: 1; padding: 12px; border-radius: var(--radius); background: var(--vert); color: white; border: none; font-size: 14px; font-weight: 700; cursor: pointer; }
+.btn-terminer:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* TWO COL */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 24px; }
@@ -661,10 +778,26 @@ async function terminerCourse() {
 .quick-actions { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 0.5px solid var(--bordure); flex-wrap: wrap; background: var(--fond); }
 .quick-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--bordure); background: white; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--texte); transition: all 0.2s; }
 .quick-btn:hover { border-color: var(--vert); color: var(--vert); background: var(--vert-light); }
-.devis-form { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 0.5px solid var(--bordure); flex-wrap: wrap; background: var(--vert-light); }
-.devis-form input { flex: 1; min-width: 140px; padding: 8px 12px; border: 1px solid var(--bordure); border-radius: var(--radius); font-size: 13px; }
-.btn-envoyer-devis { background: var(--vert); color: white; border: none; padding: 8px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 700; cursor: pointer; }
+.yango-form { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; border-bottom: 0.5px solid var(--bordure); background: var(--vert-light); }
+.yango-form input { padding: 8px 12px; border: 1px solid var(--bordure); border-radius: var(--radius); font-size: 13px; }
+.btn-envoyer-devis { background: var(--vert); color: white; border: none; padding: 10px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 700; cursor: pointer; }
 .btn-envoyer-devis:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-fermer-recherche { background: none; border: none; color: var(--texte-sec); font-size: 12px; cursor: pointer; padding: 4px; text-align: center; text-decoration: underline; }
+.livraison-etat { font-size: 12px; color: var(--texte-sec); font-weight: 600; padding: 6px 4px; }
+.yango-recherche { border-bottom: 0.5px solid var(--bordure); }
+.recherche-chargement { text-align: center; padding: 20px 16px; }
+.spinner-sm { width: 26px; height: 26px; border: 3px solid var(--bordure); border-top-color: var(--vert); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 10px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.recherche-chargement p { font-size: 12px; color: var(--texte-sec); }
+.candidats-livreurs { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; background: var(--vert-light); }
+.candidat-livreur { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: white; border-radius: 10px; padding: 10px 12px; border: 1px solid var(--bordure); }
+.candidat-nom { font-size: 13px; font-weight: 700; margin: 0 0 2px; color: var(--texte); }
+.candidat-note { font-weight: 500; color: var(--texte-sec); font-size: 12px; }
+.candidat-detail { font-size: 11px; color: var(--texte-sec); margin: 0; }
+.candidat-prix { text-align: right; flex-shrink: 0; }
+.candidat-prix strong { display: block; font-size: 13px; color: var(--vert-dark); margin-bottom: 4px; }
+.btn-choisir-livreur { background: var(--vert); color: white; border: none; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.btn-relancer-recherche { background: none; border: none; color: var(--vert-dark); font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px; text-align: center; }
 .tchat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #f8faf9; }
 .message { display: flex; flex-direction: column; }
 .message.coursiere { align-items: flex-end; }
@@ -676,11 +809,6 @@ async function terminerCourse() {
 .liste-bubble { background: white !important; border: 1.5px solid var(--vert) !important; padding: 0 !important; overflow: hidden; min-width: 220px; }
 .liste-bubble-header { background: var(--vert); color: white; padding: 8px 14px; font-size: 12px; font-weight: 700; }
 .liste-bubble-content { padding: 10px 14px; font-size: 13px; color: var(--texte); white-space: pre-wrap; line-height: 1.6; }
-.devis-bubble { background: white !important; border: 1.5px solid #f59e0b !important; padding: 0 !important; overflow: hidden; min-width: 220px; }
-.devis-bubble-header { background: #f59e0b; color: white; padding: 8px 14px; font-size: 12px; font-weight: 700; }
-.devis-line { display: flex; justify-content: space-between; padding: 8px 14px 0; font-size: 13px; color: var(--texte-sec); }
-.devis-line strong { color: var(--texte); }
-.devis-total { display: flex; justify-content: space-between; padding: 8px 14px; font-size: 14px; font-weight: 700; color: var(--texte); border-top: 0.5px solid var(--bordure); margin-top: 6px; }
 .tchat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 0.5px solid var(--bordure); align-items: center; background: white; }
 .tchat-input input { flex: 1; padding: 10px 16px; border: 1px solid var(--bordure); border-radius: 24px; font-size: 13px; background: var(--fond); color: var(--texte); }
 .tchat-input input:focus { border-color: var(--vert); outline: none; }

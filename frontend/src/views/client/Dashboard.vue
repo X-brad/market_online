@@ -2,7 +2,7 @@
   <div class="dashboard">
 
     <!-- PROGRESSION -->
-    <div class="progression-bar" v-if="etape > 0">
+    <div class="progression-bar" v-if="etape > 0 && etape !== 0.5">
       <div class="container">
         <div class="steps-prog">
           <div
@@ -44,7 +44,7 @@
       <div v-if="etape === 0" class="accueil-dash">
 
         <!-- CARD NOUVELLE COMMANDE -->
-        <div class="card nouvelle-commande-card" @click="etape = 1">
+        <div class="card nouvelle-commande-card" @click="etape = 0.5">
           <div class="nc-left">
             <span class="nc-icon">🛒</span>
             <div>
@@ -72,7 +72,7 @@
               v-for="m in marches"
               :key="m.nom"
               class="marche-rapide"
-              @click="lancerCommande(m.nom)"
+              @click="lancerCommande(m)"
             >
               <span>{{ m.icon }}</span>
               <p>{{ m.nom }}</p>
@@ -90,7 +90,7 @@
           <div class="empty-histo" v-if="historiqueCommandes.length === 0">
             <span>🛒</span>
             <p>Aucune commande pour l'instant</p>
-            <button class="btn-commander" @click="etape = 1">Passer ma première commande →</button>
+            <button class="btn-commander" @click="etape = 0.5">Passer ma première commande →</button>
           </div>
           <div class="histo-list" v-else>
             <div class="histo-item" v-for="h in historiqueCommandes.slice(0, 5)" :key="h._id">
@@ -114,6 +114,47 @@
 
       </div>
 
+      <!-- CHOIX COMMUNE / PREMIUM -->
+      <div v-if="etape === 0.5" class="choix-commune-wrap">
+        <div class="section-title">
+          <h2>Où voulez-vous que vos courses soient faites ?</h2>
+        </div>
+        <div class="card choix-commune-card" v-if="!afficherChoixAutreCommune">
+          <p>Voulez-vous que votre course soit faite dans votre commune, <strong>{{ authStore.user?.commune }}</strong> ?</p>
+          <div class="choix-commune-btns">
+            <button class="btn-next" @click="choisirPropreCommune">Oui, ma commune</button>
+            <button class="btn-back" @click="afficherChoixAutreCommune = true">Non, une autre commune</button>
+          </div>
+        </div>
+
+        <div class="card choix-commune-card" v-else>
+          <template v-if="authStore.user?.premium?.actif">
+            <p>Choisissez la commune où vous voulez que votre course soit effectuée :</p>
+            <select v-model="communeChoisie" class="commune-select">
+              <option value="">Choisir une commune</option>
+              <option v-for="c in communesDisponibles" :key="c" :value="c">{{ c }}</option>
+            </select>
+            <div class="choix-commune-btns">
+              <button class="btn-back" @click="afficherChoixAutreCommune = false">← Retour</button>
+              <button class="btn-next" :disabled="!communeChoisie" @click="validerCommuneChoisie">Continuer →</button>
+            </div>
+          </template>
+          <template v-else>
+            <div class="premium-upsell">
+              <span class="premium-icon">✨</span>
+              <h3>Fonctionnalité Premium</h3>
+              <p>Abonnez-vous pour choisir la commune où vous voulez que votre course soit effectuée, ou restez dans votre commune actuelle.</p>
+              <button class="btn-next" style="width:100%" @click="souscrirePremium">✨ S'abonner ({{ prixPremium }} F CFA / mois)</button>
+              <button class="btn-back" style="width:100%;margin-top:10px" @click="choisirPropreCommune">Rester dans ma commune</button>
+            </div>
+          </template>
+        </div>
+
+        <div class="action-row">
+          <button class="btn-back" @click="etape = 0; afficherChoixAutreCommune = false">← Annuler</button>
+        </div>
+      </div>
+
       <!-- ÉTAPE 1 : LISTE + MARCHÉ -->
       <div v-if="etape === 1">
         <div class="section-title">
@@ -135,9 +176,10 @@
           </div>
           <div class="card marche-card-dash">
             <h3>🏪 Choisir le marché</h3>
+            <p class="marche-commune-info">📍 Marchés de {{ communeSelectionnee }}</p>
             <div class="marches-list">
               <div
-                v-for="m in marches"
+                v-for="m in marchesFiltres"
                 :key="m.nom"
                 class="marche-item"
                 :class="{ active: marcheChoisi === m.nom }"
@@ -165,7 +207,7 @@
   <div class="section-title">
     <span class="step-tag">Étape 2</span>
     <h2>Coursières disponibles</h2>
-    <p>Votre demande sera envoyée à toutes les coursières disponibles au <strong>{{ marcheChoisi }}</strong> — la première à l'accepter s'en occupera</p>
+    <p>Votre demande sera proposée à la coursière disponible la plus proche du <strong>{{ marcheChoisi }}</strong>. Si elle ne répond pas, elle sera proposée à la suivante.</p>
   </div>
 
   <!-- CHARGEMENT -->
@@ -225,13 +267,23 @@
         </div>
 
         <!-- EN ATTENTE D'UNE COURSIÈRE -->
-        <div class="chargement" v-if="enAttenteAssignation">
+        <div class="chargement" v-if="enAttenteAssignation && !aucuneCoursiereDisponible">
           <div class="spinner"></div>
           <p>Recherche d'une coursière disponible au {{ marcheChoisi }}...</p>
           <button class="btn-back" @click="etape = 2">← Annuler</button>
         </div>
 
-        <div class="tchat-layout" v-if="!enAttenteAssignation">
+        <!-- AUCUNE COURSIÈRE DISPONIBLE -->
+        <div class="chargement" v-if="aucuneCoursiereDisponible">
+          <span style="font-size:40px;display:block;margin-bottom:12px">😔</span>
+          <p>Aucune coursière disponible pour le moment.</p>
+          <div class="action-row" style="justify-content:center">
+            <button class="btn-back" @click="etape = 2">← Retour</button>
+            <button class="btn-next" @click="reessayerRecherche">Réessayer</button>
+          </div>
+        </div>
+
+        <div class="tchat-layout" v-if="!enAttenteAssignation && !aucuneCoursiereDisponible">
           <div class="tchat-main">
             <div class="card tchat-card">
               <div class="tchat-header">
@@ -247,8 +299,6 @@
               </div>
               <div class="quick-actions">
                 <button class="quick-btn" @click="envoyerListe">📋 Envoyer ma liste</button>
-                <button class="quick-btn" @click="demanderDevis">💰 Demander un devis</button>
-                <button class="quick-btn" @click="confirmerAccord" v-if="devisRecu">✅ Confirmer l'accord</button>
               </div>
               <div class="tchat-messages" ref="messagesEl">
                 <div v-for="(msg, i) in messages" :key="i" class="message" :class="msg.from">
@@ -257,29 +307,22 @@
                     <div class="liste-bubble-content">{{ msg.text }}</div>
                     <div class="liste-bubble-footer">{{ marcheChoisi }}</div>
                   </div>
-                  <div v-else-if="msg.type === 'devis'" class="bubble devis-bubble">
-                    <div class="devis-bubble-header">💰 Proposition de devis</div>
-                    <div class="devis-line"><span>Frais prestation</span><strong>{{ msg.devis.prestation }} F</strong></div>
-                    <div class="devis-line"><span>Frais livraison</span><strong>{{ msg.devis.livraison }} F</strong></div>
-                    <div class="devis-total"><span>Total frais</span><strong>{{ msg.devis.prestation + msg.devis.livraison }} F</strong></div>
-                    <div class="devis-actions" v-if="msg.from === 'coursiere' && !devisAccepte">
-                      <button class="btn-refuser-devis" @click="refuserDevis">Refuser</button>
-                      <button class="btn-accepter-devis" @click="accepterDevis()">Accepter ✓</button>
-                    </div>
-                    <div class="devis-accepte" v-if="devisAccepte && msg.from === 'coursiere'">✓ Devis accepté</div>
-                  </div>
                   <div v-else class="bubble">{{ msg.text }}</div>
                   <span class="msg-time">{{ msg.time }}</span>
                 </div>
               </div>
               <div class="tchat-input">
-                <input v-model="nouveauMsg" placeholder="Écrire un message..." @keyup.enter="envoyerMessage" :disabled="devisAccepte" />
-                <button class="btn-send" @click="envoyerMessage" :disabled="!nouveauMsg.trim() || devisAccepte"><span>➤</span></button>
+                <input v-model="nouveauMsg" placeholder="Écrire un message..." @keyup.enter="envoyerMessage" :disabled="budgetValide" />
+                <button class="btn-send" @click="envoyerMessage" :disabled="!nouveauMsg.trim() || budgetValide"><span>➤</span></button>
               </div>
-              <div class="tchat-locked" v-if="devisAccepte">✅ Accord confirmé — vous pouvez procéder au paiement</div>
+              <div class="tchat-locked" v-if="budgetValide">✅ Budget validé — vous pouvez procéder au paiement</div>
             </div>
           </div>
           <div class="tchat-sidebar">
+            <div class="card carte-card">
+              <h3>🗺️ Suivi en direct</h3>
+              <div ref="carteMapEl" class="carte-livraison"></div>
+            </div>
             <div class="card recap-card">
               <h3>📋 Récapitulatif</h3>
               <div class="recap-section">
@@ -288,16 +331,20 @@
               </div>
               <div class="recap-divider"></div>
               <div class="recap-section">
-                <p class="recap-section-title">Montants convenus</p>
-                <div class="recap-item"><span>Budget courses</span><strong :class="{ 'val-pending': !budgetCourses }">{{ budgetCourses ? budgetCourses + ' F' : 'À définir par la coursière' }}</strong></div>
-                <div class="recap-item"><span>Frais prestation</span><strong :class="{ 'val-pending': !fraisPrestation }">{{ fraisPrestation ? fraisPrestation + ' F' : 'En discussion' }}</strong></div>
-                <div class="recap-item"><span>Frais livraison</span><strong :class="{ 'val-pending': !fraisLivraison }">{{ fraisLivraison ? fraisLivraison + ' F' : 'En discussion' }}</strong></div>
+                <p class="recap-section-title">Votre budget de courses</p>
+                <div class="budget-section" v-if="!budgetValide">
+                  <input v-model.number="budgetInput" type="number" placeholder="Montant en F CFA" class="budget-input" />
+                  <button class="btn-valider-budget" :disabled="!budgetInput" @click="validerBudget">Valider mon budget</button>
+                </div>
+                <div class="recap-item" v-else><span>Budget courses</span><strong>{{ budgetCourses }} F</strong></div>
+                <div class="recap-item" v-if="budgetValide"><span>Frais prestation</span><strong>{{ fraisPrestation }} F</strong></div>
                 <div class="recap-item"><span>Frais service</span><strong class="val-fixed">{{ fraisService }} F</strong></div>
               </div>
               <div class="recap-divider"></div>
-              <div class="recap-total"><span>Total estimé</span><strong>{{ totalEstime }} F CFA</strong></div>
-              <button class="btn-next" style="width:100%;margin-top:16px" :disabled="!devisAccepte" @click="etape = 4">
-                {{ devisAccepte ? 'Procéder au paiement →' : 'En attente d\'accord...' }}
+              <div class="recap-total"><span>Total à payer</span><strong>{{ totalEstime }} F CFA</strong></div>
+              <p class="recap-note">🛵 La livraison sera organisée par votre coursière après paiement (Yango Moto) et réglée directement au livreur.</p>
+              <button class="btn-next" style="width:100%;margin-top:16px" :disabled="!budgetValide" @click="etape = 4">
+                {{ budgetValide ? 'Procéder au paiement →' : 'Validez votre budget pour continuer' }}
               </button>
             </div>
           </div>
@@ -318,14 +365,13 @@
             <div class="paiement-details">
               <div class="recap-item"><span>Budget courses</span><strong>{{ budgetCourses }} F CFA</strong></div>
               <div class="recap-item"><span>Frais prestation</span><strong>{{ fraisPrestation }} F CFA</strong></div>
-              <div class="recap-item"><span>Frais de livraison</span><strong>{{ fraisLivraison }} F CFA</strong></div>
               <div class="recap-item"><span>Frais de service MamiMarché</span><strong>{{ fraisService }} F CFA</strong></div>
               <div class="recap-divider"></div>
               <div class="recap-total big"><span>Total à payer</span><strong>{{ totalEstime }} F CFA</strong></div>
             </div>
             <div class="paiement-info">
               <span>🔒</span>
-              <p>Votre paiement transite par la plateforme MamiMarché. Les fonds sont reversés à la coursière après confirmation de votre livraison.</p>
+              <p>Votre paiement transite par la plateforme MamiMarché. Une fois vos courses faites, votre coursière vous proposera un livreur Yango Moto — les frais de livraison seront à régler directement à ce livreur.</p>
             </div>
             <button class="btn-wave" @click="payerWave">🌊 Payer {{ totalEstime }} F via Wave</button>
             <button class="btn-back" style="width:100%;margin-top:10px" @click="etape = 3">← Retour au tchat</button>
@@ -333,33 +379,80 @@
         </div>
       </div>
 
-      <!-- ÉTAPE 5 : CONFIRMATION -->
-      <div v-if="etape === 5" class="confirmation">
-        <div class="confirm-icon">🎉</div>
-        <h2>Commande confirmée !</h2>
-        <p>Votre paiement a été reçu. <strong>{{ coursiereChos?.nom }}</strong> a été notifiée et va effectuer vos courses au <strong>{{ marcheChoisi }}</strong>.</p>
-        <div class="confirm-steps">
-          <div class="confirm-step done">✓ Paiement reçu</div>
-          <div class="confirm-step done">✓ Coursière notifiée</div>
-          <div class="confirm-step pending">⏳ Courses en cours...</div>
-          <div class="confirm-step pending">🏠 Livraison à domicile</div>
-        </div>
-        <div class="rating-section" v-if="!noteEnvoyee">
-          <p>Notez votre coursière</p>
-          <div class="stars">
-            <span
-              v-for="n in 5"
-              :key="n"
-              class="star"
-              :class="{ active: n <= (noteHover || 0) }"
-              @mouseenter="noteHover = n"
-              @mouseleave="noteHover = 0"
-              @click="envoyerNote(n)"
-            >★</span>
+      <!-- ÉTAPE 5 : LIVRAISON + CONFIRMATION -->
+      <div v-if="etape === 5">
+
+        <!-- EN ATTENTE D'UNE PROPOSITION DE LIVREUR -->
+        <div v-if="courseStatut !== 'livree' && (!livraisonData || livraisonData.statut === 'non_demandee')" class="confirmation">
+          <div class="confirm-icon">💳</div>
+          <h2>Paiement reçu !</h2>
+          <p><strong>{{ coursiereChos?.nom }}</strong> va effectuer vos courses au <strong>{{ marcheChoisi }}</strong>, puis vous proposera un livreur Yango Moto.</p>
+          <div class="chargement">
+            <div class="spinner"></div>
+            <p>En attente d'une proposition de livraison...</p>
           </div>
         </div>
-        <p class="rating-done" v-else>Merci pour votre note ⭐ {{ noteDonnee }}/5</p>
-        <button class="btn-next" @click="nouvelleCommande">Passer une nouvelle commande</button>
+
+        <!-- REÇU YANGO PROPOSÉ -->
+        <div v-else-if="livraisonData.statut === 'proposee'" class="livraison-recu-wrap">
+          <div class="section-title">
+            <h2>🛵 Livraison proposée</h2>
+            <p>Votre coursière a trouvé un livreur Yango Moto</p>
+          </div>
+          <div class="card livraison-recu">
+            <div class="recu-ligne"><span>Livreur</span><strong>{{ livraisonData.livreurNom }}</strong></div>
+            <div class="recu-ligne"><span>Téléphone</span><strong>{{ livraisonData.livreurTelephone }}</strong></div>
+            <div class="recu-ligne"><span>Adresse de livraison</span><strong>{{ livraisonData.adresseLivraison }}</strong></div>
+            <div class="recu-ligne"><span>Récupération estimée</span><strong>{{ livraisonData.dureeRecuperation }}</strong></div>
+            <div class="recu-ligne"><span>Livraison estimée</span><strong>{{ livraisonData.dureeLivraison }}</strong></div>
+            <div class="recap-divider"></div>
+            <div class="recu-ligne total"><span>Prix Yango (à régler au livreur)</span><strong>{{ livraisonData.prix }} F CFA</strong></div>
+            <div class="livraison-actions">
+              <button class="btn-back" @click="refuserLivraison">Chercher un autre livreur</button>
+              <button class="btn-next" @click="accepterLivraison">Accepter ✓</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- LIVREUR ACCEPTÉ / COMMANDÉ -->
+        <div v-else-if="courseStatut !== 'livree'" class="confirmation">
+          <div class="confirm-icon">🛵</div>
+          <h2>{{ livraisonData.statut === 'commandee' ? 'Livreur commandé !' : 'Livreur accepté !' }}</h2>
+          <p><strong>{{ livraisonData.livreurNom }}</strong> va récupérer et livrer vos courses. Prévoyez <strong>{{ livraisonData.prix }} F CFA</strong> à lui régler directement à la livraison.</p>
+          <div class="confirm-steps">
+            <div class="confirm-step done">✓ Paiement reçu</div>
+            <div class="confirm-step" :class="livraisonData.statut === 'commandee' ? 'done' : 'pending'">{{ livraisonData.statut === 'commandee' ? '✓ Livreur réservé' : '⏳ En attente de réservation' }}</div>
+            <div class="confirm-step pending">🏠 Livraison à domicile</div>
+          </div>
+        </div>
+
+        <!-- CONFIRMATION FINALE -->
+        <div v-else class="confirmation">
+          <div class="confirm-icon">🎉</div>
+          <h2>Commande confirmée !</h2>
+          <p>Votre commande a été livrée par <strong>{{ coursiereChos?.nom }}</strong> via le livreur <strong>{{ livraisonData?.livreurNom }}</strong>. Merci d'avoir utilisé MamiMarché !</p>
+          <div class="confirm-steps">
+            <div class="confirm-step done">✓ Paiement reçu</div>
+            <div class="confirm-step done">✓ Livreur réservé</div>
+            <div class="confirm-step done">✓ Livraison effectuée</div>
+          </div>
+          <div class="rating-section" v-if="!noteEnvoyee">
+            <p>Notez votre coursière</p>
+            <div class="stars">
+              <span
+                v-for="n in 5"
+                :key="n"
+                class="star"
+                :class="{ active: n <= (noteHover || 0) }"
+                @mouseenter="noteHover = n"
+                @mouseleave="noteHover = 0"
+                @click="envoyerNote(n)"
+              >★</span>
+            </div>
+          </div>
+          <p class="rating-done" v-else>Merci pour votre note ⭐ {{ noteDonnee }}/5</p>
+          <button class="btn-next" @click="nouvelleCommande">Passer une nouvelle commande</button>
+        </div>
       </div>
 
     </div>
@@ -384,6 +477,14 @@ import socket from '../../api/socket.js'
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toast'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import iconUrl from 'leaflet/dist/images/marker-icon.png'
+import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
+import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
+
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl })
 
 const authStore = useAuthStore()
 const toast = useToastStore()
@@ -394,12 +495,20 @@ const coursiereChos = ref(null)
 const nouveauMsg = ref('')
 const messagesEl = ref(null)
 const budgetCourses = ref(null)
+const budgetInput = ref(null)
+const budgetValide = ref(false)
 const fraisPrestation = ref(null)
-const fraisLivraison = ref(null)
 const fraisService = ref(200)
+const prixPremium = ref(2000)
 
-const devisRecu = ref(false)
-const devisAccepte = ref(false)
+const afficherChoixAutreCommune = ref(false)
+const communeChoisie = ref('')
+const communeSelectionnee = ref(authStore.user?.commune || '')
+const aucuneCoursiereDisponible = ref(false)
+const carteMapEl = ref(null)
+
+const livraisonData = ref(null)
+const courseStatut = ref('en_attente')
 const enAttenteAssignation = ref(false)
 const courseId = ref(null)
 const historiqueCommandes = ref([])
@@ -424,16 +533,54 @@ async function chargerMarches() {
   }
 }
 
+async function chargerFraisService() {
+  try {
+    const res = await api.get('/parametres')
+    fraisService.value = res.data.fraisService
+    prixPremium.value = res.data.prixPremiumClient
+  } catch (err) {
+    console.error('Erreur paramètres:', err)
+  }
+}
+
+function choisirPropreCommune() {
+  communeSelectionnee.value = authStore.user?.commune || ''
+  afficherChoixAutreCommune.value = false
+  etape.value = 1
+}
+
+function validerCommuneChoisie() {
+  if (!communeChoisie.value) return
+  communeSelectionnee.value = communeChoisie.value
+  afficherChoixAutreCommune.value = false
+  etape.value = 1
+}
+
+async function souscrirePremium() {
+  try {
+    const res = await api.put('/client/premium')
+    authStore.mettreAJourUser({ premium: res.data.premium })
+    toast.success('Abonnement premium activé !')
+  } catch (err) {
+    toast.error('Erreur lors de la souscription')
+  }
+}
+
 onMounted(() => {
   chargerHistorique()
   chargerMarches()
+  chargerFraisService()
 })
 
 onUnmounted(() => {
   socket.off('nouveau_message')
-  socket.off('devis_propose')
   socket.off('course_assignee')
+  socket.off('livraison_maj')
+  socket.off('statut_change')
+  socket.off('dispatching_epuise')
+  socket.off('position_maj')
   if (socket.connected) socket.disconnect()
+  detruireCarte()
 })
 
 const initiales = computed(() => {
@@ -442,7 +589,7 @@ const initiales = computed(() => {
   return (u.prenom?.[0] || '') + (u.nom?.[0] || '')
 })
 const totalEstime = computed(() => {
-  return (budgetCourses.value || 0) + (fraisPrestation.value || 0) + (fraisLivraison.value || 0) + fraisService.value
+  return (budgetCourses.value || 0) + (fraisPrestation.value || 0) + fraisService.value
 })
 
 const headerStats = ref([
@@ -466,6 +613,8 @@ const etapes = [
 ]
 
 const marches = ref([])
+const marchesFiltres = computed(() => marches.value.filter(m => m.commune === communeSelectionnee.value))
+const communesDisponibles = computed(() => [...new Set(marches.value.map(m => m.commune))])
 
 const coursieres = ref([])
 const chargementCoursieres = ref(false)
@@ -534,28 +683,69 @@ async function envoyerMessageApi(payload) {
   }
 }
 
-function lancerCommande(nomMarche) {
-  marcheChoisi.value = nomMarche
+function lancerCommande(marche) {
+  communeSelectionnee.value = marche.commune
+  marcheChoisi.value = marche.nom
   etape.value = 1
+}
+
+let carteMap = null
+let markerCoursiere = null
+let markerMarche = null
+
+function initCarte() {
+  if (carteMap || !carteMapEl.value) return
+  const m = marches.value.find(mm => mm.nom === marcheChoisi.value)
+  const centre = m?.lat != null ? [m.lat, m.lng] : [5.36, -4.0]
+  carteMap = L.map(carteMapEl.value).setView(centre, 13)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 18
+  }).addTo(carteMap)
+  if (m?.lat != null) {
+    markerMarche = L.marker([m.lat, m.lng]).addTo(carteMap).bindPopup('🏪 ' + m.nom)
+  }
+}
+
+function majPositionCoursiereCarte(lat, lng) {
+  if (!carteMap || lat == null || lng == null) return
+  if (!markerCoursiere) {
+    markerCoursiere = L.marker([lat, lng]).addTo(carteMap).bindPopup('🛵 Votre coursière')
+  } else {
+    markerCoursiere.setLatLng([lat, lng])
+  }
+  carteMap.panTo([lat, lng])
+}
+
+function detruireCarte() {
+  if (carteMap) {
+    carteMap.remove()
+    carteMap = null
+    markerCoursiere = null
+    markerMarche = null
+  }
 }
 
 async function publierDemande() {
   try {
     const res = await api.post('/courses', {
       marche: marcheChoisi.value,
-      commune: authStore.user?.commune,
+      commune: communeSelectionnee.value,
       liste: liste.value,
       mode: 'standard'
     })
     courseId.value = res.data.course._id
     coursiereChos.value = null
     enAttenteAssignation.value = true
-    devisRecu.value = false
-    devisAccepte.value = false
+    aucuneCoursiereDisponible.value = false
+    budgetValide.value = false
+    budgetInput.value = null
     budgetCourses.value = null
     fraisPrestation.value = null
-    fraisLivraison.value = null
+    livraisonData.value = null
+    courseStatut.value = 'en_attente'
     messages.value = []
+    detruireCarte()
 
     const histRes = await api.get(`/courses/${courseId.value}/messages`)
     messages.value = histRes.data.messages.map(formaterMessage)
@@ -563,13 +753,17 @@ async function publierDemande() {
     socket.connect()
     socket.emit('rejoindre_course', courseId.value)
     socket.off('nouveau_message')
-    socket.off('devis_propose')
     socket.off('course_assignee')
+    socket.off('livraison_maj')
+    socket.off('statut_change')
+    socket.off('dispatching_epuise')
+    socket.off('position_maj')
 
     socket.on('course_assignee', ({ course }) => {
       coursiereChos.value = mapCoursiereUser(course.coursiere)
       enAttenteAssignation.value = false
       toast.success(`${coursiereChos.value.nom} a accepté votre commande !`)
+      nextTick(() => initCarte())
     })
 
     socket.on('nouveau_message', (msg) => {
@@ -577,19 +771,25 @@ async function publierDemande() {
       scrollBottom()
     })
 
-    socket.on('devis_propose', ({ course }) => {
-      budgetCourses.value = course.budgetCourses
-      fraisPrestation.value = course.fraisPrestation
-      fraisLivraison.value = course.fraisLivraison
-      fraisService.value = course.fraisService || 200
-      devisRecu.value = true
-      messages.value.push({
-        from: 'coursiere',
-        type: 'devis',
-        devis: { prestation: course.fraisPrestation, livraison: course.fraisLivraison },
-        time: getTime()
-      })
-      scrollBottom()
+    socket.on('livraison_maj', ({ course }) => {
+      livraisonData.value = course.livraison
+      if (course.livraison.statut === 'proposee') toast.info('🛵 Un livreur vous a été proposé !')
+      if (course.livraison.statut === 'acceptee') toast.success('Livraison acceptée, en attente de confirmation de la coursière.')
+      if (course.livraison.statut === 'commandee') toast.success('Livreur commandé !')
+    })
+
+    socket.on('statut_change', ({ course }) => {
+      courseStatut.value = course.statut
+      if (course.statut === 'livree') toast.success('Votre commande a été livrée ! 🎉')
+    })
+
+    socket.on('dispatching_epuise', () => {
+      enAttenteAssignation.value = false
+      aucuneCoursiereDisponible.value = true
+    })
+
+    socket.on('position_maj', ({ lat, lng }) => {
+      majPositionCoursiereCarte(lat, lng)
     })
 
     etape.value = 3
@@ -600,8 +800,13 @@ async function publierDemande() {
   }
 }
 
+function reessayerRecherche() {
+  aucuneCoursiereDisponible.value = false
+  publierDemande()
+}
+
 async function envoyerMessage() {
-  if (!nouveauMsg.value.trim() || devisAccepte.value) return
+  if (!nouveauMsg.value.trim() || budgetValide.value) return
   const texte = nouveauMsg.value
   nouveauMsg.value = ''
   await envoyerMessageApi({ texte, type: 'normal' })
@@ -612,22 +817,18 @@ async function envoyerListe() {
   await envoyerMessageApi({ texte: liste.value, type: 'liste' })
 }
 
-async function demanderDevis() {
-  await envoyerMessageApi({ texte: 'Pouvez-vous me proposer un devis pour vos frais ?', type: 'normal' })
-}
-
-async function accepterDevis() {
-  devisAccepte.value = true
-  await envoyerMessageApi({ texte: '✅ J\'accepte votre devis. Je vais procéder au paiement.', type: 'normal' })
-  toast.success('Devis accepté ! Procédez au paiement.')
-}
-
-async function refuserDevis() {
-  await envoyerMessageApi({ texte: 'Je souhaite négocier les frais, pouvez-vous revoir votre proposition ?', type: 'normal' })
-}
-
-function confirmerAccord() {
-  etape.value = 4
+async function validerBudget() {
+  if (!budgetInput.value) return
+  try {
+    const res = await api.put(`/courses/${courseId.value}/budget`, { budgetCourses: budgetInput.value })
+    budgetCourses.value = res.data.course.budgetCourses
+    fraisPrestation.value = res.data.fraisPrestation
+    fraisService.value = res.data.course.fraisService
+    budgetValide.value = true
+    toast.success('Budget validé !')
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Erreur lors de la validation du budget')
+  }
 }
 
 async function payerWave() {
@@ -637,13 +838,31 @@ async function payerWave() {
       methodePaiement: 'wave',
       montantTotal: totalEstime.value
     })
+    courseStatut.value = 'en_cours'
+    livraisonData.value = { statut: 'non_demandee' }
     etape.value = 5
     headerStats.value[0].val = String(parseInt(headerStats.value[0].val) + 1)
     toast.success('Paiement effectué avec succès ! 🎉')
-    if (socket.connected) socket.disconnect()
   } catch (err) {
     toast.error('Erreur lors du paiement')
     console.error(err)
+  }
+}
+
+async function accepterLivraison() {
+  try {
+    await api.put(`/courses/${courseId.value}/livraison`, { action: 'accepter' })
+  } catch (err) {
+    toast.error('Erreur lors de l\'acceptation de la livraison')
+  }
+}
+
+async function refuserLivraison() {
+  try {
+    await api.put(`/courses/${courseId.value}/livraison`, { action: 'refuser' })
+    toast.info('Votre coursière va chercher un autre livreur.')
+  } catch (err) {
+    toast.error('Erreur')
   }
 }
 
@@ -693,17 +912,22 @@ function nouvelleCommande() {
   marcheChoisi.value = ''
   coursiereChos.value = null
   budgetCourses.value = null
+  budgetInput.value = null
+  budgetValide.value = false
   fraisPrestation.value = null
-  fraisLivraison.value = null
+  livraisonData.value = null
+  courseStatut.value = 'en_attente'
   messages.value = []
-  devisRecu.value = false
-  devisAccepte.value = false
   enAttenteAssignation.value = false
+  aucuneCoursiereDisponible.value = false
+  afficherChoixAutreCommune.value = false
+  communeChoisie.value = ''
   courseId.value = null
   noteHover.value = 0
   noteDonnee.value = 0
   noteEnvoyee.value = false
   if (socket.connected) socket.disconnect()
+  detruireCarte()
   chargerHistorique()
 }
 </script>
@@ -813,11 +1037,44 @@ function nouvelleCommande() {
 .btn-commander { background: var(--vert); color: white; padding: 10px 20px; border-radius: var(--radius); border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .btn-commander:hover { background: var(--vert-dark); }
 
+/* HISTORIQUE (accueil) */
+.histo-list { display: flex; flex-direction: column; }
+.histo-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 0.5px solid var(--bordure); flex-wrap: wrap; }
+.histo-item:last-child { border-bottom: none; }
+.histo-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.histo-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.histo-dot.complete { background: var(--vert); }
+.histo-dot.encours { background: #f59e0b; }
+.histo-left p { font-size: 13px; font-weight: 600; margin: 0 0 2px; color: var(--texte); }
+.histo-left span { font-size: 11px; color: var(--texte-sec); }
+.histo-right { text-align: right; flex-shrink: 0; }
+.histo-right strong { display: block; font-size: 14px; color: var(--texte); margin-bottom: 2px; }
+.histo-right span { display: block; font-size: 11px; font-weight: 600; }
+.histo-right span.complete { color: var(--vert); }
+.histo-right span.encours { color: #f59e0b; }
+
 /* SECTION TITLE */
 .section-title { margin-bottom: 24px; padding-top: 28px; }
 .step-tag { display: inline-block; background: var(--vert-light); color: var(--vert-dark); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
 .section-title h2 { font-size: 22px; font-weight: 800; color: var(--texte); margin: 0 0 4px; }
 .section-title p { font-size: 14px; color: var(--texte-sec); margin: 0; }
+
+/* CHOIX COMMUNE / PREMIUM */
+.choix-commune-wrap { max-width: 520px; margin: 0 auto; }
+.choix-commune-card { text-align: center; }
+.choix-commune-card p { font-size: 15px; color: var(--texte); margin-bottom: 20px; line-height: 1.6; }
+.choix-commune-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.choix-commune-btns .btn-next, .choix-commune-btns .btn-back { flex: 1; min-width: 140px; }
+.commune-select { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--bordure); border-radius: var(--radius); font-size: 14px; color: var(--texte); margin-bottom: 16px; }
+.premium-upsell { text-align: center; }
+.premium-icon { font-size: 40px; display: block; margin-bottom: 10px; }
+.premium-upsell h3 { font-size: 18px; font-weight: 800; color: var(--vert-dark); margin: 0 0 8px; }
+.premium-upsell p { font-size: 14px; color: var(--texte-sec); margin-bottom: 20px; }
+.marche-commune-info { font-size: 12px; color: var(--texte-sec); margin: -8px 0 12px; }
+
+/* CARTE LIVE */
+.carte-card { margin-bottom: 20px; }
+.carte-livraison { height: 200px; border-radius: 10px; overflow: hidden; }
 
 /* TWO COL */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
@@ -884,15 +1141,6 @@ function nouvelleCommande() {
 .liste-bubble-header { background: var(--vert); color: white; padding: 8px 14px; font-size: 12px; font-weight: 700; }
 .liste-bubble-content { padding: 10px 14px; font-size: 13px; color: var(--texte); white-space: pre-wrap; line-height: 1.6; }
 .liste-bubble-footer { padding: 6px 14px 10px; font-size: 11px; color: var(--texte-sec); }
-.devis-bubble { background: white !important; border: 1.5px solid #f59e0b !important; padding: 0 !important; overflow: hidden; min-width: 240px; }
-.devis-bubble-header { background: #f59e0b; color: white; padding: 8px 14px; font-size: 12px; font-weight: 700; }
-.devis-line { display: flex; justify-content: space-between; padding: 8px 14px 0; font-size: 13px; color: var(--texte-sec); }
-.devis-line strong { color: var(--texte); }
-.devis-total { display: flex; justify-content: space-between; padding: 8px 14px; font-size: 14px; font-weight: 700; color: var(--texte); border-top: 0.5px solid var(--bordure); margin-top: 6px; }
-.devis-actions { display: flex; gap: 8px; padding: 10px 14px; border-top: 0.5px solid var(--bordure); }
-.btn-refuser-devis { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--bordure); background: white; font-size: 12px; cursor: pointer; color: var(--texte-sec); }
-.btn-accepter-devis { flex: 2; padding: 8px; border-radius: 8px; border: none; background: var(--vert); color: white; font-size: 12px; font-weight: 700; cursor: pointer; }
-.devis-accepte { padding: 8px 14px 10px; font-size: 12px; color: var(--vert); font-weight: 600; }
 .tchat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 0.5px solid var(--bordure); align-items: center; background: white; }
 .tchat-input input { flex: 1; padding: 10px 16px; border: 1px solid var(--bordure); border-radius: 24px; font-size: 13px; background: var(--fond); color: var(--texte); transition: border 0.2s; }
 .tchat-input input:focus { border-color: var(--vert); outline: none; }
@@ -914,6 +1162,15 @@ function nouvelleCommande() {
 .recap-divider { height: 1px; background: var(--bordure); margin: 8px 0; }
 .recap-total { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; font-size: 14px; font-weight: 700; }
 .recap-total strong { color: var(--vert-dark); font-size: 18px; }
+.recap-note { font-size: 12px; color: var(--texte-sec); background: var(--vert-light); border-radius: 8px; padding: 10px 12px; margin: 8px 0 0; line-height: 1.5; }
+
+/* BUDGET */
+.budget-section { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+.budget-input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--bordure); border-radius: var(--radius); font-size: 14px; color: var(--texte); }
+.budget-input:focus { border-color: var(--vert); outline: none; }
+.btn-valider-budget { background: var(--vert); color: white; border: none; padding: 10px; border-radius: var(--radius); font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+.btn-valider-budget:hover:not(:disabled) { background: var(--vert-dark); }
+.btn-valider-budget:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* PAIEMENT */
 .paiement-wrap { max-width: 480px; margin: 0 auto; }
@@ -937,6 +1194,17 @@ function nouvelleCommande() {
 .confirm-step.done { background: var(--vert-light); color: var(--vert-dark); }
 .confirm-step.pending { background: var(--fond); color: var(--texte-sec); border: 0.5px solid var(--bordure); }
 
+/* LIVRAISON YANGO */
+.livraison-recu-wrap { max-width: 480px; margin: 0 auto; }
+.livraison-recu { padding: 24px; }
+.recu-ligne { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 0.5px solid var(--bordure); font-size: 13px; gap: 12px; }
+.recu-ligne span { color: var(--texte-sec); }
+.recu-ligne strong { color: var(--texte); text-align: right; }
+.recu-ligne.total { font-size: 15px; font-weight: 700; border-bottom: none; }
+.recu-ligne.total strong { color: var(--vert-dark); font-size: 18px; }
+.livraison-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.livraison-actions .btn-back, .livraison-actions .btn-next { flex: 1; min-width: 140px; }
+
 /* ACTIONS */
 .action-row { display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px; padding-bottom: 20px; }
 .btn-next { background: var(--vert); color: white; padding: 14px 28px; border-radius: var(--radius); font-size: 15px; font-weight: 700; border: none; cursor: pointer; transition: all 0.2s; }
@@ -948,7 +1216,7 @@ function nouvelleCommande() {
 .recap-total.big strong { font-size: 22px; }
 
 /* SIGNALER / LITIGE */
-.btn-signaler { margin-left: 10px; background: none; border: none; color: #dc2626; font-size: 11px; font-weight: 600; cursor: pointer; }
+.btn-signaler { display: block; margin: 4px 0 0 auto; background: none; border: none; color: #dc2626; font-size: 11px; font-weight: 600; cursor: pointer; padding: 0; }
 .btn-signaler:hover { text-decoration: underline; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 24px; backdrop-filter: blur(4px); }
 .modal-litige { background: white; border-radius: 20px; padding: 32px; max-width: 420px; width: 100%; box-shadow: 0 24px 60px rgba(0,0,0,0.2); }

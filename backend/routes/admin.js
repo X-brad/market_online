@@ -123,7 +123,8 @@ router.put('/parametres', proteger, autoriser('admin'), async (req, res) => {
     const champs = [
       'unitePrixStandardVendeuse', 'unitePrixStandardNonVendeuse',
       'unitePrixPremiumVendeuse', 'unitePrixPremiumNonVendeuse',
-      'quotaStandard', 'quotaPremium', 'fraisService'
+      'quotaStandard', 'quotaPremium', 'fraisService',
+      'prixPremiumClient', 'dureePremiumJours'
     ]
     const maj = {}
     for (const champ of champs) {

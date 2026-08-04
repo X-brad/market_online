@@ -6,17 +6,24 @@ const User = require('../models/User')
 const Course = require('../models/Course')
 
 const MARCHES_INITIAUX = [
-  { nom: 'Marché de Cocody', commune: 'Cocody', icon: '🏪' },
-  { nom: 'Cocovico', commune: 'Cocody', icon: '🛒' },
-  { nom: "Marché d'Adjamé", commune: 'Adjamé', icon: '🏪' },
-  { nom: 'Marché de Treichville', commune: 'Treichville', icon: '🛒' },
-  { nom: 'Marché de Koumassi', commune: 'Koumassi', icon: '🏪' },
-  { nom: 'Marché de Bingerville', commune: 'Bingerville', icon: '🛒' }
+  { nom: 'Marché de Cocody', commune: 'Cocody', icon: '🏪', lat: 5.3599, lng: -3.9866 },
+  { nom: 'Cocovico', commune: 'Cocody', icon: '🛒', lat: 5.3550, lng: -3.9800 },
+  { nom: "Marché d'Adjamé", commune: 'Adjamé', icon: '🏪', lat: 5.3667, lng: -4.0167 },
+  { nom: 'Marché de Treichville', commune: 'Treichville', icon: '🛒', lat: 5.2926, lng: -4.0114 },
+  { nom: 'Marché de Koumassi', commune: 'Koumassi', icon: '🏪', lat: 5.2926, lng: -3.9531 },
+  { nom: 'Marché de Bingerville', commune: 'Bingerville', icon: '🛒', lat: 5.3556, lng: -3.8894 }
 ]
 
 async function assurerMarchesInitiaux() {
   const total = await Marche.countDocuments()
-  if (total === 0) await Marche.insertMany(MARCHES_INITIAUX)
+  if (total === 0) {
+    await Marche.insertMany(MARCHES_INITIAUX)
+    return
+  }
+  // Complète les coordonnées des marchés déjà existants qui n'en ont pas encore
+  for (const m of MARCHES_INITIAUX) {
+    await Marche.updateOne({ nom: m.nom, lat: null }, { $set: { lat: m.lat, lng: m.lng } })
+  }
 }
 
 // GET /api/marches — Liste des marchés (?actif=true pour ne garder que les actifs) — public

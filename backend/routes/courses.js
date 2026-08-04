@@ -5,8 +5,10 @@ const {
   mesCourses,
   coursesDisponibles,
   accepterCourse,
+  refuserCourse,
   mettreAJourStatut,
-  proposerDevis,
+  validerBudget,
+  gererLivraison,
   noterCoursiere,
   statsAdmin
 } = require('../controllers/courseController')
@@ -19,8 +21,10 @@ router.get('/disponibles', proteger, autoriser('coursiere'), coursesDisponibles)
 router.get('/stats', proteger, autoriser('admin'), statsAdmin)
 router.get('/:id/messages', proteger, messagesDeCourse)
 router.put('/:id/accepter', proteger, autoriser('coursiere'), accepterCourse)
+router.put('/:id/refuser', proteger, autoriser('coursiere'), refuserCourse)
 router.put('/:id/statut', proteger, mettreAJourStatut)
-router.put('/:id/devis', proteger, autoriser('coursiere'), proposerDevis)
+router.put('/:id/budget', proteger, autoriser('client'), validerBudget)
+router.put('/:id/livraison', proteger, gererLivraison)
 router.put('/:id/noter', proteger, autoriser('client'), noterCoursiere)
 
 module.exports = router
