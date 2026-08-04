@@ -16,7 +16,9 @@ exports.inscription = async (req, res) => {
     }
 
     const roleAutorise = role === 'coursiere' ? 'coursiere' : 'client'
-    const userData = { nom, prenom, pseudo, telephone, email, motDePasse, role: roleAutorise, commune }
+    const userData = { nom, prenom, telephone, motDePasse, role: roleAutorise, commune }
+    if (pseudo) userData.pseudo = pseudo
+    if (email) userData.email = email
     if (roleAutorise === 'coursiere' && coursiere) userData.coursiere = coursiere
 
     const user = await User.create(userData)

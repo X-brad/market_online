@@ -17,9 +17,10 @@
   </Teleport>
 </template>
 <script setup>
+import { storeToRefs } from 'pinia'
 import { useToastStore } from '../stores/toast'
 const toastStore = useToastStore()
-const toasts = toastStore.toasts
+const { toasts } = storeToRefs(toastStore)
 const remove = toastStore.remove
 </script>
 <style scoped>
