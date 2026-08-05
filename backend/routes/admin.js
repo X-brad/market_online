@@ -45,22 +45,24 @@ router.get('/coursieres', proteger, autoriser('admin'), async (req, res) => {
       .select('nom prenom telephone commune coursiere createdAt actif')
       .sort({ createdAt: -1 })
 
-    const data = coursieres.map(c => ({
+    const debutJour = new Date()
+    debutJour.setHours(0, 0, 0, 0)
+
+    const data = await Promise.all(coursieres.map(async (c) => ({
       id: c._id,
       nom: `${c.prenom} ${c.nom}`,
       initiales: (c.prenom[0] || '') + (c.nom[0] || ''),
       telephone: c.telephone,
-      marche: c.coursiere?.marches?.[0] || '—',
       commune: c.commune,
       type: c.coursiere?.typeProfile === 'premium' ? 'Premium' : 'Standard',
       statut: c.coursiere?.statut || 'hors_ligne',
       note: c.coursiere?.nombreAvis > 0
         ? Math.round(c.coursiere.note / c.coursiere.nombreAvis * 10) / 10
         : 0,
-      courses: c.coursiere?.coursesAujourdhui || 0,
+      courses: await Course.countDocuments({ coursiere: c._id, createdAt: { $gte: debutJour } }),
       valide: c.coursiere?.valide || false,
       actif: c.actif
-    }))
+    })))
 
     res.json({ succes: true, coursieres: data })
   } catch (err) {

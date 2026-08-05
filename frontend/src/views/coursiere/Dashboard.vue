@@ -27,6 +27,17 @@
           </div>
         </div>
 
+        <!-- VALIDATION EN ATTENTE -->
+        <div class="unites-bar" v-if="!estValidee" style="background:#fff3e0;border-color:#ffcc80">
+          <div class="unites-left">
+            <span class="unites-icon">⏳</span>
+            <div>
+              <p class="unites-title">Compte en attente de validation</p>
+              <p class="unites-sub">Un administrateur doit valider votre compte avant que vous puissiez recevoir des courses.</p>
+            </div>
+          </div>
+        </div>
+
         <!-- UNITÉS -->
         <div class="unites-bar" :class="{ active: unitesActives }">
           <div class="unites-left">
@@ -440,7 +451,7 @@ async function toggleStatut() {
     if (nouveauStatut === 'disponible') demarrerSuiviPosition()
     else arreterSuiviPosition()
   } catch (err) {
-    toast.error('Erreur lors du changement de statut')
+    toast.error(err.response?.data?.message || 'Erreur lors du changement de statut')
   }
 }
 

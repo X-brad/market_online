@@ -16,7 +16,8 @@ async function calculerCandidats(course) {
     actif: true,
     commune: communeRegex(course.commune),
     'coursiere.statut': 'disponible',
-    'coursiere.unitesActives': true
+    'coursiere.unitesActives': true,
+    'coursiere.valide': true
   })
 
   const debutJour = new Date()

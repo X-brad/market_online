@@ -19,7 +19,8 @@ router.get('/disponibles', proteger, async (req, res) => {
       role: 'coursiere',
       actif: true,
       'coursiere.statut': 'disponible',
-      'coursiere.unitesActives': true
+      'coursiere.unitesActives': true,
+      'coursiere.valide': true
     }
     if (commune) filtre.commune = communeRegex(commune)
 
@@ -81,6 +82,9 @@ router.get('/toutes', proteger, autoriser('admin'), async (req, res) => {
 router.put('/statut', proteger, autoriser('coursiere'), async (req, res) => {
   try {
     const { statut } = req.body
+    if (statut === 'disponible' && !req.user.coursiere?.valide) {
+      return res.status(403).json({ succes: false, message: 'Votre compte est en attente de validation par l\'administrateur' })
+    }
     await User.findByIdAndUpdate(req.user._id, { 'coursiere.statut': statut })
     getIO()?.emit('coursiere_statut_change', { userId: req.user._id, statut })
     res.json({ succes: true, message: 'Statut mis à jour' })

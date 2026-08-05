@@ -99,7 +99,7 @@
             <thead>
               <tr>
                 <th>Coursière</th>
-                <th>Marché</th>
+                <th>Commune</th>
                 <th>Type</th>
                 <th>Statut</th>
                 <th>Note</th>
@@ -119,7 +119,7 @@
                     </div>
                   </div>
                 </td>
-                <td>{{ c.marche }}</td>
+                <td>📍 {{ c.commune }}</td>
                 <td>
                   <span class="type-badge" :class="c.type.toLowerCase()">{{ c.type }}</span>
                 </td>
@@ -131,13 +131,13 @@
                 <td>⭐ {{ c.note }}</td>
                 <td>{{ c.courses }}</td>
                 <td>
-                  <span class="valid-badge" :class="c.validee ? 'validee' : 'pending'">
-                    {{ c.validee ? '✓ Validée' : '⏳ En attente' }}
+                  <span class="valid-badge" :class="c.valide ? 'validee' : 'pending'">
+                    {{ c.valide ? '✓ Validée' : '⏳ En attente' }}
                   </span>
                 </td>
                 <td>
                   <div class="action-btns">
-                    <button class="btn-sm green" @click="validerCoursiere(c)" v-if="!c.validee">✓</button>
+                    <button class="btn-sm green" @click="validerCoursiere(c)" v-if="!c.valide">✓</button>
                     <button class="btn-sm red" @click="suspendreCoursiere(c)">🚫</button>
                     <button class="btn-sm gray" @click="voirCoursiere(c)">👁</button>
                   </div>
@@ -410,7 +410,7 @@ const coursieresFiltrees = computed(() => {
     const matchSearch = c.nom.toLowerCase().includes(searchCoursiere.value.toLowerCase())
     const matchFiltre = filtreCoursiere.value === 'tous' ||
       (filtreCoursiere.value === 'disponible' && c.statut === 'disponible') ||
-      (filtreCoursiere.value === 'pending' && !c.validee) ||
+      (filtreCoursiere.value === 'pending' && !c.valide) ||
       (filtreCoursiere.value === 'premium' && c.type === 'Premium')
     return matchSearch && matchFiltre
   })
