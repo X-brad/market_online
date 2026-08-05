@@ -1,6 +1,7 @@
 const express = require('express')
 const mongoose = require('mongoose')
 const cors = require('cors')
+const path = require('path')
 const { createServer } = require('http')
 const { init: initSocket } = require('./socket')
 const corsOrigins = require('./utils/corsOrigins')
@@ -14,6 +15,7 @@ app.use(cors({
   credentials: true
 }))
 app.use(express.json())  // ← ajoute cette ligne ici;
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 app.use('/api/auth', require('./routes/auth'))
 app.use('/api/client', require('./routes/client'))
 app.use('/api/coursiere', require('./routes/coursiere'))

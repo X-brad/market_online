@@ -6,7 +6,10 @@
       <div class="container">
         <div class="dash-header">
           <div class="dash-left">
-            <div class="avatar-big">{{ initiales }}</div>
+            <div class="avatar-big">
+              <img v-if="photoUrl" :src="photoUrl" alt="Photo de profil" />
+              <span v-else>{{ initiales }}</span>
+            </div>
             <div>
               <h1>Bonjour, {{ authStore.user?.prenom }} 👋</h1>
               <p>📍 {{ authStore.user?.commune }} · Coursière MamiMarché</p>
@@ -18,7 +21,7 @@
               <button
                 class="toggle-btn"
                 :class="statut"
-                @click="toggleStatut"
+                @click="(e) => { ripple(e); toggleStatut() }"
               >
                 <span class="toggle-dot"></span>
                 {{ statut === 'disponible' ? 'Disponible' : 'Hors ligne' }}
@@ -61,7 +64,13 @@
 
       <!-- STATS -->
       <div class="stats-grid">
-        <div class="stat-card" v-for="s in stats" :key="s.label">
+        <div
+          class="stat-card"
+          :class="{ visible: statsVisibles }"
+          v-for="(s, i) in stats"
+          :key="s.label"
+          :style="{ transitionDelay: (i * 80) + 'ms' }"
+        >
           <span class="stat-icon">{{ s.icon }}</span>
           <p class="stat-val">{{ s.val }}</p>
           <p class="stat-label">{{ s.label }}</p>
@@ -92,8 +101,8 @@
           </div>
         </div>
         <div class="course-actions">
-          <button class="btn-refuser" @click="refuserCourse">Refuser</button>
-          <button class="btn-accepter" @click="accepterCourse">Accepter la course ✓</button>
+          <button class="btn-refuser" @click="(e) => { ripple(e); refuserCourse() }">Refuser</button>
+          <button class="btn-accepter" @click="(e) => { ripple(e); accepterCourse() }">Accepter la course ✓</button>
         </div>
       </div>
 
@@ -114,7 +123,7 @@
         </div>
         <div class="encours-actions">
           <button class="btn-tchat" @click="showTchat = true">💬 Contacter le client</button>
-          <button class="btn-terminer" :disabled="livraisonData?.statut !== 'commandee'" @click="terminerCourse">Livraison effectuée ✓</button>
+          <button class="btn-terminer" :disabled="livraisonData?.statut !== 'commandee'" @click="(e) => { ripple(e); terminerCourse() }">Livraison effectuée ✓</button>
         </div>
       </div>
 
@@ -146,7 +155,18 @@
         <div class="card">
           <h3 class="card-title">👩🏾 Mon profil</h3>
           <div class="profil-info">
-            <div class="profil-avatar">{{ initiales }}</div>
+            <div class="profil-avatar-wrap" @click="declencherChoixPhoto">
+              <div class="profil-avatar">
+                <img v-if="photoUrl" :src="photoUrl" alt="Photo de profil" />
+                <span v-else>{{ initiales }}</span>
+              </div>
+              <div class="profil-avatar-overlay">
+                <span v-if="uploadingPhoto" class="avatar-spinner"></span>
+                <span v-else>📷</span>
+              </div>
+              <span class="avatar-edit-badge" v-if="!uploadingPhoto">📷</span>
+              <input ref="photoInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden @change="onPhotoChoisie" />
+            </div>
             <div class="profil-details">
               <p class="profil-nom">{{ authStore.user?.prenom }} {{ authStore.user?.nom }}</p>
               <p class="profil-commune">📍 {{ authStore.user?.commune }}</p>
@@ -285,6 +305,53 @@ import { useToastStore } from '../../stores/toast'
 const authStore = useAuthStore()
 const toast = useToastStore()
 
+const apiOrigin = api.defaults.baseURL.replace(/\/api\/?$/, '')
+const photoUrl = computed(() => authStore.user?.photoUrl ? apiOrigin + authStore.user.photoUrl : null)
+const photoInput = ref(null)
+const uploadingPhoto = ref(false)
+
+function ripple(e) {
+  const btn = e.currentTarget
+  if (!btn || btn.disabled) return
+  const rect = btn.getBoundingClientRect()
+  const taille = Math.max(rect.width, rect.height) * 1.6
+  const span = document.createElement('span')
+  span.className = 'ripple-effect'
+  span.style.width = span.style.height = `${taille}px`
+  span.style.left = `${(e.clientX ?? rect.left + rect.width / 2) - rect.left - taille / 2}px`
+  span.style.top = `${(e.clientY ?? rect.top + rect.height / 2) - rect.top - taille / 2}px`
+  const style = getComputedStyle(btn)
+  if (style.position === 'static') btn.style.position = 'relative'
+  btn.style.overflow = 'hidden'
+  btn.appendChild(span)
+  span.addEventListener('animationend', () => span.remove())
+}
+
+function declencherChoixPhoto() {
+  if (uploadingPhoto.value) return
+  photoInput.value?.click()
+}
+
+async function onPhotoChoisie(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  uploadingPhoto.value = true
+  const formData = new FormData()
+  formData.append('photo', file)
+  try {
+    const res = await api.post('/coursiere/photo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    authStore.mettreAJourUser({ photoUrl: res.data.photoUrl })
+    toast.success('Photo de profil mise à jour 📸')
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Erreur lors de l\'envoi de la photo')
+  } finally {
+    uploadingPhoto.value = false
+    e.target.value = ''
+  }
+}
+
 const statut = ref(authStore.user?.coursiere?.statut || 'hors_ligne')
 const unitesActives = ref(authStore.user?.coursiere?.unitesActives || false)
 const quotaJournalier = ref(authStore.user?.coursiere?.quotaJournalier || 10)
@@ -348,6 +415,34 @@ async function chargerProfil() {
   }
 }
 
+function animerValeurStat(index, nouvelleValeurBrute) {
+  const ancienneChaine = stats.value[index].val
+  const matchAncien = ancienneChaine.match(/-?\d+(\.\d+)?/)
+  const matchNouveau = String(nouvelleValeurBrute).match(/-?\d+(\.\d+)?/)
+  if (!matchAncien || !matchNouveau) {
+    stats.value[index].val = String(nouvelleValeurBrute)
+    return
+  }
+  const debut = parseFloat(matchAncien[0])
+  const fin = parseFloat(matchNouveau[0])
+  if (debut === fin) { stats.value[index].val = String(nouvelleValeurBrute); return }
+
+  const suffixe = String(nouvelleValeurBrute).slice(matchNouveau[0].length)
+  const decimales = matchNouveau[0].includes('.') ? 1 : 0
+  const duree = 650
+  const debutTemps = performance.now()
+
+  function tick(maintenant) {
+    const t = Math.min(1, (maintenant - debutTemps) / duree)
+    const ease = 1 - Math.pow(1 - t, 3)
+    const valeurActuelle = debut + (fin - debut) * ease
+    stats.value[index].val = valeurActuelle.toFixed(decimales) + suffixe
+    if (t < 1) requestAnimationFrame(tick)
+    else stats.value[index].val = String(nouvelleValeurBrute)
+  }
+  requestAnimationFrame(tick)
+}
+
 function recalculerStats() {
   const aujourdhui = new Date().toDateString()
   const debutMois = new Date()
@@ -361,10 +456,10 @@ function recalculerStats() {
   const livreesMois = livrees.filter(c => new Date(c.createdAt) >= debutMois)
   const revenusJour = livreesAujourdhui.reduce((acc, c) => acc + gain(c), 0)
 
-  stats.value[0].val = String(livreesAujourdhui.length)
-  stats.value[1].val = `${revenusJour} F`
-  stats.value[2].val = String(noteMoyenne.value)
-  stats.value[3].val = String(livreesMois.length)
+  animerValeurStat(0, String(livreesAujourdhui.length))
+  animerValeurStat(1, `${revenusJour} F`)
+  animerValeurStat(2, String(noteMoyenne.value))
+  animerValeurStat(3, String(livreesMois.length))
 
   historique.value = livrees
     .slice()
@@ -416,9 +511,12 @@ function arreterSuiviPosition() {
   }
 }
 
+const statsVisibles = ref(false)
+
 onMounted(async () => {
   await chargerProfil()
   await chargerHistorique()
+  requestAnimationFrame(() => { statsVisibles.value = true })
 
   socket.connect()
   socket.emit('rejoindre_coursiere', authStore.user?.id)
@@ -668,7 +766,8 @@ async function terminerCourse() {
 .dash-top { background: linear-gradient(135deg, var(--vert-dark), var(--vert)); padding: 32px 0 24px; color: white; }
 .dash-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
 .dash-left { display: flex; align-items: center; gap: 16px; }
-.avatar-big { width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,0.2); color: white; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; flex-shrink: 0; }
+.avatar-big { width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,0.2); color: white; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
+.avatar-big img { width: 100%; height: 100%; object-fit: cover; }
 .dash-left h1 { font-size: 22px; font-weight: 800; margin: 0 0 4px; }
 .dash-left p { font-size: 13px; opacity: 0.8; margin: 0; }
 .statut-toggle { display: flex; align-items: center; gap: 10px; font-size: 14px; }
@@ -730,7 +829,14 @@ async function terminerCourse() {
 
 /* STATS */
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
-.stat-card { background: white; border-radius: 14px; padding: 20px; text-align: center; border: 0.5px solid var(--bordure); box-shadow: var(--shadow); }
+.stat-card {
+  background: white; border-radius: 14px; padding: 20px; text-align: center;
+  border: 0.5px solid var(--bordure); box-shadow: var(--shadow);
+  opacity: 0; transform: translateY(14px) scale(0.97);
+  transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+.stat-card.visible { opacity: 1; transform: translateY(0) scale(1); }
+.stat-card:hover { box-shadow: 0 8px 20px rgba(0,0,0,0.08); transform: translateY(-3px); }
 .stat-icon { font-size: 28px; display: block; margin-bottom: 8px; }
 .stat-val { font-size: 24px; font-weight: 800; color: var(--vert-dark); margin: 0 0 4px; }
 .stat-label { font-size: 12px; color: var(--texte-sec); margin: 0; }
@@ -788,7 +894,32 @@ async function terminerCourse() {
 
 /* PROFIL */
 .profil-info { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 0.5px solid var(--bordure); }
-.profil-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--vert); color: white; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; }
+.profil-avatar-wrap { position: relative; width: 52px; height: 52px; border-radius: 50%; cursor: pointer; flex-shrink: 0; transition: transform 0.2s ease; }
+.profil-avatar-wrap:hover { transform: scale(1.05); }
+.profil-avatar-wrap:hover .profil-avatar-overlay { opacity: 1; }
+.profil-avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--vert); color: white; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; overflow: hidden; }
+.profil-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profil-avatar-overlay {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: rgba(0,0,0,0.45); color: white; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s ease;
+}
+.avatar-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.ripple-effect {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: rgba(255,255,255,0.55);
+  transform: scale(0); animation: rippleAnim 0.55s ease-out;
+}
+@keyframes rippleAnim { to { transform: scale(1); opacity: 0; } }
+.avatar-edit-badge {
+  position: absolute; bottom: -2px; right: -2px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--vert); border: 2px solid white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
 .profil-nom { font-size: 15px; font-weight: 700; margin: 0 0 2px; color: var(--texte); }
 .profil-commune { font-size: 12px; color: var(--texte-sec); margin: 0; }
 .profil-items { display: flex; flex-direction: column; gap: 10px; }

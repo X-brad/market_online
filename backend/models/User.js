@@ -10,6 +10,7 @@ const UserSchema = new mongoose.Schema({
   motDePasse: { type: String, required: true, minlength: 6, select: false },
   role: { type: String, enum: ['client', 'coursiere', 'admin'], default: 'client' },
   commune: { type: String, required: true },
+  photoUrl: { type: String, default: null },
   premium: {
     actif: { type: Boolean, default: false },
     expiration: { type: Date, default: null }

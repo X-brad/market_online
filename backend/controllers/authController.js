@@ -34,7 +34,8 @@ exports.inscription = async (req, res) => {
         pseudo: user.pseudo,
         telephone: user.telephone,
         role: user.role,
-        commune: user.commune
+        commune: user.commune,
+        photoUrl: user.photoUrl
       }
     })
   } catch (err) {
@@ -75,6 +76,7 @@ exports.connexion = async (req, res) => {
         telephone: user.telephone,
         role: user.role,
         commune: user.commune,
+        photoUrl: user.photoUrl,
         coursiere: user.role === 'coursiere' ? user.coursiere : undefined
       }
     })

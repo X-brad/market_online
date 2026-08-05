@@ -1,5 +1,8 @@
 const express = require('express')
 const router = express.Router()
+const path = require('path')
+const fs = require('fs')
+const multer = require('multer')
 const { proteger, autoriser } = require('../middleware/auth')
 const User = require('../models/User')
 const Settings = require('../models/Settings')
@@ -8,6 +11,46 @@ const Marche = require('../models/Marche')
 const { distanceKm } = require('../utils/geo')
 const { communeRegex } = require('../utils/text')
 const { getIO } = require('../socket')
+
+const DOSSIER_PHOTOS = path.join(__dirname, '..', 'uploads', 'profils')
+fs.mkdirSync(DOSSIER_PHOTOS, { recursive: true })
+
+const uploadPhoto = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, DOSSIER_PHOTOS),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase()
+      cb(null, `${req.user._id}-${Date.now()}${ext}`)
+    }
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)) {
+      return cb(new Error('Format d\'image non supporté (jpeg, png, webp ou gif uniquement)'))
+    }
+    cb(null, true)
+  }
+})
+
+// POST /api/coursiere/photo — Upload de la photo de profil
+router.post('/photo', proteger, autoriser('coursiere'), uploadPhoto.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ succes: false, message: 'Aucune image envoyée' })
+
+    const ancienUser = await User.findById(req.user._id).select('photoUrl')
+    const photoUrl = `/uploads/profils/${req.file.filename}`
+    await User.findByIdAndUpdate(req.user._id, { photoUrl })
+
+    if (ancienUser?.photoUrl) {
+      const ancienChemin = path.join(DOSSIER_PHOTOS, path.basename(ancienUser.photoUrl))
+      fs.unlink(ancienChemin, () => {})
+    }
+
+    res.json({ succes: true, photoUrl })
+  } catch (err) {
+    res.status(500).json({ succes: false, message: err.message })
+  }
+})
 
 // GET /api/coursiere/disponibles?commune=...&marche=... — aperçu réel des coursières
 // éligibles pour une commande (celles réellement susceptibles de recevoir la

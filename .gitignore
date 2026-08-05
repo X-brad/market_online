@@ -17,6 +17,9 @@
 # Build frontend
 **/dist/
 
+# Photos de profil uploadées
+backend/uploads/
+
 # Logs
 *.log
 
