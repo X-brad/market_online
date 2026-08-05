@@ -2,6 +2,7 @@ const User = require('../models/User')
 const Course = require('../models/Course')
 const Marche = require('../models/Marche')
 const { distanceKm } = require('../utils/geo')
+const { communeRegex } = require('../utils/text')
 const { getIO } = require('../socket')
 
 const DELAI_OFFRE_MS = 20000
@@ -13,9 +14,9 @@ async function calculerCandidats(course) {
   const candidates = await User.find({
     role: 'coursiere',
     actif: true,
+    commune: communeRegex(course.commune),
     'coursiere.statut': 'disponible',
-    'coursiere.unitesActives': true,
-    'coursiere.marches': course.marche
+    'coursiere.unitesActives': true
   })
 
   const debutJour = new Date()

@@ -207,7 +207,7 @@
   <div class="section-title">
     <span class="step-tag">Étape 2</span>
     <h2>Coursières disponibles</h2>
-    <p>Votre demande sera proposée à la coursière disponible la plus proche du <strong>{{ marcheChoisi }}</strong>. Si elle ne répond pas, elle sera proposée à la suivante.</p>
+    <p>Votre demande sera proposée automatiquement à la coursière disponible la plus proche du <strong>{{ marcheChoisi }}</strong>. Si elle ne répond pas, elle sera proposée à la suivante — vous ne choisissez pas vous-même.</p>
   </div>
 
   <!-- CHARGEMENT -->
@@ -623,7 +623,9 @@ async function chargerCoursieres() {
   coursieres.value = []
   chargementCoursieres.value = true
   try {
-    const res = await api.get('/coursiere/disponibles')
+    const res = await api.get('/coursiere/disponibles', {
+      params: { commune: communeSelectionnee.value, marche: marcheChoisi.value }
+    })
     coursieres.value = res.data.coursieres
     if (coursieres.value.length === 0) {
       toast.warning('Aucune coursière disponible pour l\'instant')
@@ -1098,8 +1100,7 @@ function nouvelleCommande() {
 
 /* COURSIÈRES */
 .coursieres-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 20px; }
-.coursiere-card { background: white; border-radius: 14px; padding: 18px; border: 1.5px solid var(--bordure); cursor: pointer; transition: all 0.2s; }
-.coursiere-card:hover:not(.occupee) { border-color: var(--vert); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(29,158,117,0.1); }
+.coursiere-card { background: white; border-radius: 14px; padding: 18px; border: 1.5px solid var(--bordure); }
 .coursiere-card.occupee { opacity: 0.5; cursor: not-allowed; }
 .coursiere-top { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .coursiere-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--vert); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }

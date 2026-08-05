@@ -4,6 +4,7 @@ const { proteger, autoriser } = require('../middleware/auth')
 const Marche = require('../models/Marche')
 const User = require('../models/User')
 const Course = require('../models/Course')
+const { communeRegex } = require('../utils/text')
 
 const MARCHES_INITIAUX = [
   { nom: 'Marché de Cocody', commune: 'Cocody', icon: '🏪', lat: 5.3599, lng: -3.9866 },
@@ -50,7 +51,7 @@ router.get('/stats', proteger, autoriser('admin'), async (req, res) => {
     debutJour.setHours(0, 0, 0, 0)
 
     const data = await Promise.all(marches.map(async (m) => {
-      const coursieres = await User.find({ role: 'coursiere', 'coursiere.marches': m.nom })
+      const coursieres = await User.find({ role: 'coursiere', commune: communeRegex(m.commune) })
       const coursesJour = await Course.countDocuments({ marche: m.nom, createdAt: { $gte: debutJour } })
       const avecAvis = coursieres.filter(c => c.coursiere?.nombreAvis > 0)
       const note = avecAvis.length > 0
