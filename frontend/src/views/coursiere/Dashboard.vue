@@ -193,6 +193,33 @@
         </div>
 
       </div>
+
+      <!-- TARIFS -->
+      <div class="card tarifs-dash-card">
+        <h3 class="card-title">💰 Tarifs & abonnement</h3>
+        <div class="tarifs-toggle">
+          <button type="button" :class="{ active: profilAffiche === 'standard' }" @click="profilAffiche = 'standard'">⭐ Standard</button>
+          <button type="button" :class="{ active: profilAffiche === 'premium' }" @click="profilAffiche = 'premium'">💎 Premium</button>
+          <span class="toggle-thumb" :class="profilAffiche"></span>
+        </div>
+        <Transition name="tarif-swap" mode="out-in">
+          <div class="tarif-contenu" :key="profilAffiche">
+            <p class="tarif-prix">
+              {{ profilAffiche === 'standard' ? parametresTarifs.unitePrixStandardVendeuse : parametresTarifs.unitePrixPremiumVendeuse }} F CFA
+              <span>/ jour</span>
+            </p>
+            <ul class="tarif-features">
+              <li>✓ {{ profilAffiche === 'standard' ? parametresTarifs.quotaStandard : parametresTarifs.quotaPremium }} courses par jour</li>
+              <li>✓ {{ profilAffiche === 'standard' ? 'Visibilité normale' : 'Visibilité prioritaire' }}</li>
+              <li>✓ {{ profilAffiche === 'standard' ? 'Marché le plus proche' : 'Tout marché au choix' }}</li>
+              <li>✓ {{ profilAffiche === 'standard' ? 'Tchat intégré' : 'Tchat + appel intégré' }}</li>
+            </ul>
+          </div>
+        </Transition>
+        <button class="tarif-cta" @click="(e) => { ripple(e); choisirTarifEtAcheter() }">
+          Choisir {{ profilAffiche === 'standard' ? 'Standard' : 'Premium' }} →
+        </button>
+      </div>
     </div>
 
     <!-- MODALE UNITÉS -->
@@ -398,10 +425,23 @@ const coursesAujourdhuiCalcule = computed(() => {
   return mesCoursesRaw.value.filter(c => new Date(c.createdAt).toDateString() === aujourdhui).length
 })
 
-const unitesOptions = [
-  { type: 'Standard', icon: '⭐', prix: 500, quota: 10 },
-  { type: 'Premium', icon: '💎', prix: 1000, quota: 15 }
-]
+const parametresTarifs = ref({
+  unitePrixStandardVendeuse: 500,
+  unitePrixPremiumVendeuse: 1000,
+  quotaStandard: 10,
+  quotaPremium: 15
+})
+const profilAffiche = ref('standard')
+
+const unitesOptions = computed(() => [
+  { type: 'Standard', icon: '⭐', prix: parametresTarifs.value.unitePrixStandardVendeuse, quota: parametresTarifs.value.quotaStandard },
+  { type: 'Premium', icon: '💎', prix: parametresTarifs.value.unitePrixPremiumVendeuse, quota: parametresTarifs.value.quotaPremium }
+])
+
+function choisirTarifEtAcheter() {
+  uniteChoisie.value = profilAffiche.value === 'standard' ? 'Standard' : 'Premium'
+  showUnites.value = true
+}
 
 async function chargerProfil() {
   try {
@@ -412,6 +452,15 @@ async function chargerProfil() {
     quotaJournalier.value = authStore.user.coursiere?.quotaJournalier || 10
   } catch (err) {
     console.error('Erreur profil:', err)
+  }
+}
+
+async function chargerTarifs() {
+  try {
+    const res = await api.get('/parametres')
+    parametresTarifs.value = res.data
+  } catch (err) {
+    console.error('Erreur tarifs:', err)
   }
 }
 
@@ -516,6 +565,7 @@ const statsVisibles = ref(false)
 onMounted(async () => {
   await chargerProfil()
   await chargerHistorique()
+  chargerTarifs()
   requestAnimationFrame(() => { statsVisibles.value = true })
 
   socket.connect()
@@ -880,6 +930,57 @@ async function terminerCourse() {
 @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
 .card { background: white; border-radius: 14px; padding: 20px; border: 0.5px solid var(--bordure); box-shadow: var(--shadow); }
 .card-title { font-size: 15px; font-weight: 700; color: var(--texte); margin: 0 0 16px; }
+
+/* TARIFS */
+.tarifs-dash-card { margin-top: 20px; max-width: 420px; }
+.tarifs-toggle {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--fond);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 20px;
+}
+.tarifs-toggle button {
+  position: relative;
+  z-index: 1;
+  background: none;
+  border: none;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--texte-sec);
+  cursor: pointer;
+  border-radius: 9px;
+  transition: color 0.25s ease;
+}
+.tarifs-toggle button.active { color: var(--vert-dark); }
+.toggle-thumb {
+  position: absolute;
+  top: 4px; bottom: 4px; left: 4px;
+  width: calc(50% - 4px);
+  background: white;
+  border-radius: 9px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.toggle-thumb.premium { transform: translateX(100%); }
+.tarif-prix { font-size: 26px; font-weight: 800; color: var(--vert-dark); margin: 0 0 16px; }
+.tarif-prix span { font-size: 13px; font-weight: 600; color: var(--texte-sec); }
+.tarif-features { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.tarif-features li { font-size: 13px; color: var(--texte); display: flex; align-items: center; gap: 8px; }
+.tarif-swap-enter-active, .tarif-swap-leave-active { transition: all 0.25s ease; }
+.tarif-swap-enter-from { opacity: 0; transform: translateX(8px); }
+.tarif-swap-leave-to { opacity: 0; transform: translateX(-8px); }
+.tarif-cta {
+  position: relative; overflow: hidden;
+  width: 100%; margin-top: 18px; padding: 12px;
+  background: var(--vert); color: white; border: none;
+  border-radius: var(--radius); font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background 0.2s ease;
+}
+.tarif-cta:hover { background: var(--vert-dark); }
 
 /* HISTORIQUE */
 .historique { display: flex; flex-direction: column; gap: 10px; }

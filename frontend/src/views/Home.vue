@@ -181,31 +181,9 @@
             <p class="demo-legende">↑ Aperçu réel de l'expérience coursière</p>
           </div>
 
-          <!-- TARIFS -->
-          <div class="tarifs-card">
-            <div class="tarifs-toggle">
-              <button type="button" :class="{ active: profilActif === 'standard' }" @click="profilActif = 'standard'">⭐ Standard</button>
-              <button type="button" :class="{ active: profilActif === 'premium' }" @click="profilActif = 'premium'">💎 Premium</button>
-              <span class="toggle-thumb" :class="profilActif"></span>
-            </div>
-            <Transition name="tarif-swap" mode="out-in">
-              <div class="tarif-contenu" :key="profilActif">
-                <p class="tarif-prix">
-                  {{ profilActif === 'standard' ? tarifsCoursiere.unitePrixStandardVendeuse : tarifsCoursiere.unitePrixPremiumVendeuse }} F CFA
-                  <span>/ jour</span>
-                </p>
-                <ul class="tarif-features">
-                  <li>✓ {{ profilActif === 'standard' ? tarifsCoursiere.quotaStandard : tarifsCoursiere.quotaPremium }} courses par jour</li>
-                  <li>✓ {{ profilActif === 'standard' ? 'Visibilité normale' : 'Visibilité prioritaire' }}</li>
-                  <li>✓ {{ profilActif === 'standard' ? 'Marché le plus proche' : 'Tout marché au choix' }}</li>
-                  <li>✓ {{ profilActif === 'standard' ? 'Tchat intégré' : 'Tchat + appel intégré' }}</li>
-                </ul>
-              </div>
-            </Transition>
-            <button class="btn-hero-primary tarif-cta" @click="ouvrirModal('rejoindre comme coursière ' + profilActif)">
-              Rejoindre en tant que coursière →
-            </button>
-          </div>
+          <button class="devenir-cta" @click="ouvrirModal('devenir coursière')">
+            Rejoindre en tant que coursière →
+          </button>
 
         </div>
       </div>
@@ -261,13 +239,6 @@ onMounted(async () => {
   } catch (err) {
     console.error('Erreur marchés:', err)
   }
-  try {
-    const res = await api.get('/parametres/public')
-    tarifsCoursiere.value = res.data
-  } catch (err) {
-    console.error('Erreur tarifs coursière:', err)
-  }
-
   heroInterval = setInterval(cyclerCandidat, 4500)
   demoInterval = setInterval(avancerDemo, DUREE_ETAPE_DEMO)
 })
@@ -321,14 +292,11 @@ function cyclerCandidat() {
 }
 
 // ── SECTION "DEVENEZ COURSIÈRE" : démo du parcours réel d'une course ──
-const tarifsCoursiere = ref({ unitePrixStandardVendeuse: 500, unitePrixPremiumVendeuse: 1000, quotaStandard: 10, quotaPremium: 15 })
-const profilActif = ref('standard')
-
 const etapesDemo = [
-  { cle: 'notif', icon: '🔔', titre: 'Nouvelle course disponible', texte: "Marché d'Adjamé · 2,5 km", image: 'https://images.unsplash.com/photo-1653762379954-8943c787e78b?w=500&h=650&fit=crop&q=80' },
-  { cle: 'acceptee', icon: '✅', titre: 'Course acceptée', texte: 'Cliente : Fatou D. · Liste reçue', image: 'https://images.unsplash.com/photo-1758600587355-fb8e9d5db5db?w=500&h=650&fit=crop&crop=focalpoint&fp-x=0.35&fp-y=0.5&q=80' },
-  { cle: 'route', icon: '🛵', titre: 'En route vers le marché', texte: 'Position GPS partagée en direct', image: 'https://images.unsplash.com/photo-1653725565489-dfddc2b4cbf0?w=500&h=650&fit=crop&q=80' },
-  { cle: 'gain', icon: '💰', titre: 'Course livrée', texte: 'Gain crédité sur votre compte', image: 'https://images.unsplash.com/photo-1743807059700-1d4d97003972?w=500&h=650&fit=crop&q=80' }
+  { cle: 'notif', icon: '🔔', titre: 'Nouvelle course disponible', texte: "Marché d'Adjamé · 2,5 km", image: 'https://images.unsplash.com/photo-1653762379954-8943c787e78b?w=900&h=560&fit=crop&q=80' },
+  { cle: 'acceptee', icon: '✅', titre: 'Course acceptée', texte: 'Cliente : Fatou D. · Liste reçue', image: 'https://images.unsplash.com/photo-1758600587355-fb8e9d5db5db?w=900&h=560&fit=crop&crop=focalpoint&fp-x=0.35&fp-y=0.5&q=80' },
+  { cle: 'route', icon: '🛵', titre: 'En route vers le marché', texte: 'Position GPS partagée en direct', image: 'https://images.unsplash.com/photo-1653725565489-dfddc2b4cbf0?w=900&h=560&fit=crop&q=80' },
+  { cle: 'gain', icon: '💰', titre: 'Course livrée', texte: 'Gain crédité sur votre compte', image: 'https://images.unsplash.com/photo-1743807059700-1d4d97003972?w=900&h=560&fit=crop&q=80' }
 ]
 const etapeDemoIndex = ref(0)
 const etapeDemoActuelle = computed(() => etapesDemo[etapeDemoIndex.value])
@@ -629,15 +597,26 @@ const whys = [
 
 /* ── DEVENIR COURSIÈRE ── */
 .devenir { padding: 90px 0; background: var(--fond); }
-.devenir-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 860px; margin: 0 auto; align-items: stretch; }
-@media (max-width: 760px) { .devenir-grid { grid-template-columns: 1fr; } }
+.devenir-grid { display: flex; flex-direction: column; align-items: center; gap: 28px; max-width: 900px; margin: 0 auto; }
+.devenir-cta {
+  background: var(--vert);
+  color: white;
+  padding: 15px 36px;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.devenir-cta:hover { background: var(--vert-dark); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(29,158,117,0.25); }
 
 /* Démo téléphone — photo plein cadre façon story */
-.demo-phone-wrap { display: flex; flex-direction: column; align-items: center; }
+.demo-phone-wrap { display: flex; flex-direction: column; align-items: center; width: 100%; }
 .demo-phone {
   position: relative;
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 16 / 10;
   border-radius: 26px;
   overflow: hidden;
   box-shadow: 0 16px 40px rgba(29,158,117,0.22);
@@ -672,59 +651,6 @@ const whys = [
 .demo-swap-enter-active, .demo-swap-leave-active { transition: opacity 0.35s ease; }
 .demo-swap-enter-from, .demo-swap-leave-to { opacity: 0; }
 .demo-legende { font-size: 11px; color: var(--texte-sec); margin: 14px 0 0; }
-
-/* Carte tarifs */
-.tarifs-card {
-  background: white;
-  border-radius: 20px;
-  padding: 26px 24px;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--bordure);
-  display: flex;
-  flex-direction: column;
-}
-.tarifs-toggle {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  background: var(--fond);
-  border-radius: 12px;
-  padding: 4px;
-  margin-bottom: 20px;
-}
-.tarifs-toggle button {
-  position: relative;
-  z-index: 1;
-  background: none;
-  border: none;
-  padding: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--texte-sec);
-  cursor: pointer;
-  border-radius: 9px;
-  transition: color 0.25s ease;
-}
-.tarifs-toggle button.active { color: var(--vert-dark); }
-.toggle-thumb {
-  position: absolute;
-  top: 4px; bottom: 4px; left: 4px;
-  width: calc(50% - 4px);
-  background: white;
-  border-radius: 9px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.toggle-thumb.premium { transform: translateX(100%); }
-.tarif-contenu { flex: 1; }
-.tarif-prix { font-size: 28px; font-weight: 800; color: var(--vert-dark); margin: 0 0 18px; }
-.tarif-prix span { font-size: 14px; font-weight: 600; color: var(--texte-sec); }
-.tarif-features { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
-.tarif-features li { font-size: 14px; color: var(--texte); display: flex; align-items: center; gap: 8px; }
-.tarif-swap-enter-active, .tarif-swap-leave-active { transition: all 0.25s ease; }
-.tarif-swap-enter-from { opacity: 0; transform: translateX(8px); }
-.tarif-swap-leave-to { opacity: 0; transform: translateX(-8px); }
-.tarif-cta { width: 100%; margin-top: 22px; }
 
 /* ── WHY ── */
 .why { padding: 90px 0; background: white; }
