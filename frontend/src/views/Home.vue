@@ -37,21 +37,34 @@
         <div class="hero-visual">
           <div class="visual-card main-card">
             <div class="visual-header">
-              <span class="pulse"></span>
-              <span>Coursière disponible</span>
+              <span class="radar-wrap">
+                <span class="radar-ring" v-if="rechercheEnCours"></span>
+                <span class="radar-ring delay" v-if="rechercheEnCours"></span>
+                <span class="pulse"></span>
+              </span>
+              <span>{{ rechercheEnCours ? 'Recherche de la coursière la plus proche…' : 'Coursière trouvée' }}</span>
             </div>
-            <div class="visual-coursiere">
-              <div class="avatar">AK</div>
-              <div>
-                <p class="c-name">Amara Koné</p>
-                <p class="c-info">Marché Adjamé · ⭐ 4.9</p>
+            <Transition name="candidat-swap" mode="out-in">
+              <div class="visual-coursiere" :key="candidatActuel.nom" v-if="!rechercheEnCours">
+                <div class="avatar">{{ candidatActuel.initiales }}</div>
+                <div>
+                  <p class="c-name">{{ candidatActuel.nom }}</p>
+                  <p class="c-info">{{ candidatActuel.marche }} · ⭐ {{ candidatActuel.note }}</p>
+                </div>
+                <span class="dispo-badge">Dispo</span>
               </div>
-              <span class="dispo-badge">Dispo</span>
-            </div>
+              <div class="visual-coursiere skeleton" v-else>
+                <div class="avatar skel"></div>
+                <div>
+                  <p class="skel-line w1"></p>
+                  <p class="skel-line w2"></p>
+                </div>
+              </div>
+            </Transition>
             <div class="visual-marche">
               <span>🏪</span>
-              <span>Marché d'Adjamé</span>
-              <span class="dist">~1.2 km</span>
+              <span>{{ candidatActuel.marche }}</span>
+              <span class="dist">~{{ distanceAffichee }} km</span>
             </div>
           </div>
           <div class="visual-card mini-card left">
@@ -64,7 +77,7 @@
           <div class="visual-card mini-card right">
             <span>⚡</span>
             <div>
-              <p>~35 min</p>
+              <p>~{{ delaiAffiche }} min</p>
               <p>Délai moyen</p>
             </div>
           </div>
@@ -127,31 +140,64 @@
       </div>
     </section>
 
-    <!-- PROFILS COURSIÈRES -->
-    <section class="profiles">
+    <!-- DEVENEZ COURSIÈRE -->
+    <section class="devenir">
       <div class="container">
         <div class="section-head">
-          <span class="section-tag">Nos coursières</span>
-          <h2>Standard ou Premium</h2>
-          <p>Choisissez le niveau de service qui vous convient</p>
+          <span class="section-tag">Rejoignez l'équipe</span>
+          <h2>Devenez coursière MamiMarché</h2>
+          <p>Voici concrètement ce qui se passe quand une course arrive</p>
         </div>
-        <div class="profiles-grid">
-          <div
-            class="profile-card"
-            v-for="p in profiles"
-            :key="p.titre"
-            @click="ouvrirModal('rejoindre comme coursière ' + p.titre)"
-          >
-            <div class="profile-header" :class="p.classe">
-              <span class="profile-icon">{{ p.icon }}</span>
-              <h3>{{ p.titre }}</h3>
-              <p>{{ p.prix }}</p>
+        <div class="devenir-grid">
+
+          <!-- DÉMO PARCOURS RÉEL -->
+          <div class="demo-phone">
+            <div class="demo-notch"></div>
+            <Transition name="demo-swap" mode="out-in">
+              <div class="demo-etape" :key="etapeDemoActuelle.cle">
+                <div class="demo-icon-wrap">
+                  <svg class="timer-ring" viewBox="0 0 44 44" :key="timerRingKey">
+                    <circle class="ring-bg" cx="22" cy="22" r="19" />
+                    <circle class="ring-fg" cx="22" cy="22" r="19" />
+                  </svg>
+                  <span class="demo-icon">{{ etapeDemoActuelle.icon }}</span>
+                </div>
+                <p class="demo-titre">{{ etapeDemoActuelle.titre }}</p>
+                <p class="demo-texte">{{ etapeDemoActuelle.texte }}</p>
+              </div>
+            </Transition>
+            <div class="demo-dots">
+              <span v-for="(e, i) in etapesDemo" :key="e.cle" :class="{ active: i === etapeDemoIndex }"></span>
             </div>
-            <ul class="profile-features">
-              <li v-for="f in p.features" :key="f">✓ {{ f }}</li>
-            </ul>
-            <div class="profile-cta">Rejoindre en tant que coursière →</div>
+            <p class="demo-legende">↑ Aperçu réel de l'expérience coursière</p>
           </div>
+
+          <!-- TARIFS -->
+          <div class="tarifs-card">
+            <div class="tarifs-toggle">
+              <button type="button" :class="{ active: profilActif === 'standard' }" @click="profilActif = 'standard'">⭐ Standard</button>
+              <button type="button" :class="{ active: profilActif === 'premium' }" @click="profilActif = 'premium'">💎 Premium</button>
+              <span class="toggle-thumb" :class="profilActif"></span>
+            </div>
+            <Transition name="tarif-swap" mode="out-in">
+              <div class="tarif-contenu" :key="profilActif">
+                <p class="tarif-prix">
+                  {{ profilActif === 'standard' ? tarifsCoursiere.unitePrixStandardVendeuse : tarifsCoursiere.unitePrixPremiumVendeuse }} F CFA
+                  <span>/ jour</span>
+                </p>
+                <ul class="tarif-features">
+                  <li>✓ {{ profilActif === 'standard' ? tarifsCoursiere.quotaStandard : tarifsCoursiere.quotaPremium }} courses par jour</li>
+                  <li>✓ {{ profilActif === 'standard' ? 'Visibilité normale' : 'Visibilité prioritaire' }}</li>
+                  <li>✓ {{ profilActif === 'standard' ? 'Marché le plus proche' : 'Tout marché au choix' }}</li>
+                  <li>✓ {{ profilActif === 'standard' ? 'Tchat intégré' : 'Tchat + appel intégré' }}</li>
+                </ul>
+              </div>
+            </Transition>
+            <button class="btn-hero-primary tarif-cta" @click="ouvrirModal('rejoindre comme coursière ' + profilActif)">
+              Rejoindre en tant que coursière →
+            </button>
+          </div>
+
         </div>
       </div>
     </section>
@@ -189,7 +235,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useToastStore } from '../stores/toast'
 import api from '../api/axios.js'
 
@@ -206,11 +252,84 @@ onMounted(async () => {
   } catch (err) {
     console.error('Erreur marchés:', err)
   }
+  try {
+    const res = await api.get('/parametres/public')
+    tarifsCoursiere.value = res.data
+  } catch (err) {
+    console.error('Erreur tarifs coursière:', err)
+  }
+
+  heroInterval = setInterval(cyclerCandidat, 4500)
+  demoInterval = setInterval(avancerDemo, DUREE_ETAPE_DEMO)
+})
+
+onUnmounted(() => {
+  clearInterval(heroInterval)
+  clearInterval(demoInterval)
 })
 
 function ouvrirModal(action) {
   modalAction.value = action
   showModal.value = true
+}
+
+// ── CARTE HÉRO : simulation vivante du dispatching par proximité ──
+const candidatsDemo = [
+  { nom: 'Amara Koné', initiales: 'AK', marche: "Marché d'Adjamé", note: 4.9, distance: 1.2, delai: 35 },
+  { nom: 'Chloé Braut', initiales: 'CB', marche: 'Marché de Cocody', note: 4.7, distance: 0.8, delai: 22 },
+  { nom: 'Mariam Sita', initiales: 'MS', marche: 'Marché de Treichville', note: 4.8, distance: 1.6, delai: 40 }
+]
+const candidatIndex = ref(0)
+const rechercheEnCours = ref(false)
+const candidatActuel = computed(() => candidatsDemo[candidatIndex.value])
+const distanceAffichee = ref(candidatsDemo[0].distance.toFixed(1))
+const delaiAffiche = ref(String(candidatsDemo[0].delai))
+let heroInterval = null
+
+function animerNombre(refCible, debut, fin, decimales, duree = 700) {
+  const debutTemps = performance.now()
+  function tick(maintenant) {
+    const t = Math.min(1, (maintenant - debutTemps) / duree)
+    const ease = 1 - Math.pow(1 - t, 3)
+    const valeur = debut + (fin - debut) * ease
+    refCible.value = valeur.toFixed(decimales)
+    if (t < 1) requestAnimationFrame(tick)
+    else refCible.value = fin.toFixed(decimales)
+  }
+  requestAnimationFrame(tick)
+}
+
+function cyclerCandidat() {
+  const ancien = candidatsDemo[candidatIndex.value]
+  rechercheEnCours.value = true
+  setTimeout(() => {
+    candidatIndex.value = (candidatIndex.value + 1) % candidatsDemo.length
+    const nouveau = candidatsDemo[candidatIndex.value]
+    rechercheEnCours.value = false
+    animerNombre(distanceAffichee, ancien.distance, nouveau.distance, 1)
+    animerNombre(delaiAffiche, ancien.delai, nouveau.delai, 0)
+  }, 1100)
+}
+
+// ── SECTION "DEVENEZ COURSIÈRE" : démo du parcours réel d'une course ──
+const tarifsCoursiere = ref({ unitePrixStandardVendeuse: 500, unitePrixPremiumVendeuse: 1000, quotaStandard: 10, quotaPremium: 15 })
+const profilActif = ref('standard')
+
+const etapesDemo = [
+  { cle: 'notif', icon: '🔔', titre: 'Nouvelle course disponible', texte: "Marché d'Adjamé · 2,5 km" },
+  { cle: 'acceptee', icon: '✅', titre: 'Course acceptée', texte: 'Cliente : Fatou D. · Liste reçue' },
+  { cle: 'route', icon: '🛵', titre: 'En route vers le marché', texte: 'Position GPS partagée en direct' },
+  { cle: 'gain', icon: '💰', titre: 'Course livrée', texte: 'Gain crédité sur votre compte' }
+]
+const etapeDemoIndex = ref(0)
+const etapeDemoActuelle = computed(() => etapesDemo[etapeDemoIndex.value])
+const DUREE_ETAPE_DEMO = 3200
+const timerRingKey = ref(0)
+let demoInterval = null
+
+function avancerDemo() {
+  etapeDemoIndex.value = (etapeDemoIndex.value + 1) % etapesDemo.length
+  timerRingKey.value++
 }
 
 const stats = [
@@ -254,33 +373,6 @@ const marches = ref([
   { nom: 'Marché de Koumassi', commune: 'Koumassi', icon: '🏪' },
   { nom: 'Marché de Bingerville', commune: 'Bingerville', icon: '🛒' }
 ])
-
-const profiles = [
-  {
-    titre: 'Standard',
-    prix: '500 F CFA / jour',
-    icon: '⭐',
-    classe: 'standard',
-    features: [
-      '10 courses par jour',
-      'Visibilité normale',
-      'Marché le plus proche',
-      'Tchat intégré'
-    ]
-  },
-  {
-    titre: 'Premium',
-    prix: '1 000 F CFA / jour',
-    icon: '💎',
-    classe: 'premium',
-    features: [
-      '15 courses par jour',
-      'Visibilité prioritaire',
-      'Tout marché au choix',
-      'Tchat + appel intégré'
-    ]
-  }
-]
 
 const whys = [
   { icon: '👩🏾', titre: 'Femmes du quartier', desc: 'Nos coursières connaissent les marchés, les vendeurs et les meilleurs prix. Une expertise locale unique.' },
@@ -445,10 +537,22 @@ const whys = [
 }
 .main-card { width: 280px; }
 .visual-header { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 14px; opacity: 0.85; }
-.pulse { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 1.5s infinite; display: inline-block; }
+.radar-wrap { position: relative; width: 8px; height: 8px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 1.5s infinite; display: inline-block; position: relative; z-index: 1; }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.3)} }
-.visual-coursiere { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.radar-ring { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid #4ade80; animation: radarSweep 1.8s ease-out infinite; }
+.radar-ring.delay { animation-delay: 0.6s; }
+@keyframes radarSweep { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(6); opacity: 0; } }
+.visual-coursiere { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; min-height: 40px; }
 .avatar { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+.avatar.skel { background: rgba(255,255,255,0.12); animation: shimmer 1.2s ease-in-out infinite; }
+.skel-line { height: 10px; border-radius: 4px; background: rgba(255,255,255,0.14); animation: shimmer 1.2s ease-in-out infinite; margin: 0 0 6px; }
+.skel-line.w1 { width: 110px; }
+.skel-line.w2 { width: 80px; height: 8px; opacity: 0.8; }
+@keyframes shimmer { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+.candidat-swap-enter-active, .candidat-swap-leave-active { transition: all 0.35s ease; }
+.candidat-swap-enter-from { opacity: 0; transform: translateX(10px); }
+.candidat-swap-leave-to { opacity: 0; transform: translateX(-10px); }
 .c-name { font-size: 14px; font-weight: 600; margin: 0 0 2px; }
 .c-info { font-size: 12px; opacity: 0.7; margin: 0; }
 .dispo-badge { margin-left: auto; background: #4ade80; color: #065f46; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
@@ -514,28 +618,101 @@ const whys = [
 .marche-commune { font-size: 12px; color: var(--texte-sec); margin: 0 0 10px; }
 .marche-badge { display: inline-block; background: #dcfce7; color: #166534; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
 
-/* ── PROFILES ── */
-.profiles { padding: 90px 0; background: var(--fond); }
-.profiles-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 700px; margin: 0 auto; }
-.profile-card {
-  background: white;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: var(--shadow);
-  border: 1.5px solid transparent;
-  cursor: pointer;
-  transition: all 0.25s;
+/* ── DEVENIR COURSIÈRE ── */
+.devenir { padding: 90px 0; background: var(--fond); }
+.devenir-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 860px; margin: 0 auto; align-items: stretch; }
+@media (max-width: 760px) { .devenir-grid { grid-template-columns: 1fr; } }
+
+/* Démo téléphone */
+.demo-phone {
+  background: linear-gradient(160deg, var(--vert-dark) 0%, var(--vert) 100%);
+  border-radius: 26px;
+  padding: 28px 24px 22px;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(29,158,117,0.22);
+  position: relative;
+  min-height: 320px;
+  justify-content: center;
 }
-.profile-card:hover { border-color: var(--vert); transform: translateY(-3px); box-shadow: 0 12px 32px rgba(29,158,117,0.15); }
-.profile-header { padding: 28px; text-align: center; }
-.profile-header.standard { background: linear-gradient(135deg, #f0fdf4, #dcfce7); }
-.profile-header.premium { background: linear-gradient(135deg, var(--vert-light), #9FE1CB); }
-.profile-icon { font-size: 36px; display: block; margin-bottom: 10px; }
-.profile-header h3 { font-size: 22px; font-weight: 800; color: var(--vert-dark); margin: 0 0 6px; }
-.profile-header p { font-size: 15px; color: var(--vert); font-weight: 600; margin: 0; }
-.profile-features { list-style: none; padding: 24px 28px 16px; display: flex; flex-direction: column; gap: 12px; }
-.profile-features li { font-size: 14px; color: var(--texte); display: flex; align-items: center; gap: 8px; }
-.profile-cta { text-align: center; padding: 16px 28px 24px; font-size: 13px; font-weight: 700; color: var(--vert); }
+.demo-notch { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 46px; height: 5px; border-radius: 6px; background: rgba(255,255,255,0.25); }
+.demo-etape { display: flex; flex-direction: column; align-items: center; }
+.demo-icon-wrap { position: relative; width: 66px; height: 66px; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; }
+.timer-ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ring-bg { fill: none; stroke: rgba(255,255,255,0.2); stroke-width: 2.5; }
+.ring-fg {
+  fill: none; stroke: white; stroke-width: 2.5; stroke-linecap: round;
+  stroke-dasharray: 119.4; stroke-dashoffset: 119.4;
+  transform: rotate(-90deg); transform-origin: 50% 50%;
+  animation: ringFill 3.2s linear forwards;
+}
+@keyframes ringFill { to { stroke-dashoffset: 0; } }
+.demo-icon { font-size: 26px; }
+.demo-titre { font-size: 16px; font-weight: 700; margin: 0 0 6px; }
+.demo-texte { font-size: 13px; opacity: 0.8; margin: 0; }
+.demo-swap-enter-active, .demo-swap-leave-active { transition: all 0.35s ease; }
+.demo-swap-enter-from { opacity: 0; transform: translateY(8px) scale(0.97); }
+.demo-swap-leave-to { opacity: 0; transform: translateY(-8px) scale(0.97); }
+.demo-dots { display: flex; gap: 6px; margin-top: 22px; }
+.demo-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); transition: all 0.3s ease; }
+.demo-dots span.active { background: white; width: 18px; border-radius: 4px; }
+.demo-legende { font-size: 11px; opacity: 0.6; margin: 14px 0 0; }
+
+/* Carte tarifs */
+.tarifs-card {
+  background: white;
+  border-radius: 20px;
+  padding: 26px 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--bordure);
+  display: flex;
+  flex-direction: column;
+}
+.tarifs-toggle {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--fond);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 20px;
+}
+.tarifs-toggle button {
+  position: relative;
+  z-index: 1;
+  background: none;
+  border: none;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--texte-sec);
+  cursor: pointer;
+  border-radius: 9px;
+  transition: color 0.25s ease;
+}
+.tarifs-toggle button.active { color: var(--vert-dark); }
+.toggle-thumb {
+  position: absolute;
+  top: 4px; bottom: 4px; left: 4px;
+  width: calc(50% - 4px);
+  background: white;
+  border-radius: 9px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.toggle-thumb.premium { transform: translateX(100%); }
+.tarif-contenu { flex: 1; }
+.tarif-prix { font-size: 28px; font-weight: 800; color: var(--vert-dark); margin: 0 0 18px; }
+.tarif-prix span { font-size: 14px; font-weight: 600; color: var(--texte-sec); }
+.tarif-features { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.tarif-features li { font-size: 14px; color: var(--texte); display: flex; align-items: center; gap: 8px; }
+.tarif-swap-enter-active, .tarif-swap-leave-active { transition: all 0.25s ease; }
+.tarif-swap-enter-from { opacity: 0; transform: translateX(8px); }
+.tarif-swap-leave-to { opacity: 0; transform: translateX(-8px); }
+.tarif-cta { width: 100%; margin-top: 22px; }
 
 /* ── WHY ── */
 .why { padding: 90px 0; background: white; }

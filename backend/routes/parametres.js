@@ -11,7 +11,27 @@ router.get('/', proteger, async (req, res) => {
       succes: true,
       fraisService: settings.fraisService,
       prixPremiumClient: settings.prixPremiumClient,
-      dureePremiumJours: settings.dureePremiumJours
+      dureePremiumJours: settings.dureePremiumJours,
+      unitePrixStandardVendeuse: settings.unitePrixStandardVendeuse,
+      unitePrixPremiumVendeuse: settings.unitePrixPremiumVendeuse,
+      quotaStandard: settings.quotaStandard,
+      quotaPremium: settings.quotaPremium
+    })
+  } catch (err) {
+    res.status(500).json({ succes: false, message: err.message })
+  }
+})
+
+// GET /api/parametres/public — Tarifs coursière affichés sur la page d'accueil (sans authentification)
+router.get('/public', async (req, res) => {
+  try {
+    const settings = await Settings.getSettings()
+    res.json({
+      succes: true,
+      unitePrixStandardVendeuse: settings.unitePrixStandardVendeuse,
+      unitePrixPremiumVendeuse: settings.unitePrixPremiumVendeuse,
+      quotaStandard: settings.quotaStandard,
+      quotaPremium: settings.quotaPremium
     })
   } catch (err) {
     res.status(500).json({ succes: false, message: err.message })
