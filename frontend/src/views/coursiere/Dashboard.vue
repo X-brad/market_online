@@ -28,15 +28,18 @@
         </div>
 
         <!-- VALIDATION EN ATTENTE -->
-        <div class="unites-bar" v-if="!estValidee" style="background:#fff3e0;border-color:#ffcc80">
-          <div class="unites-left">
-            <span class="unites-icon">⏳</span>
-            <div>
-              <p class="unites-title">Compte en attente de validation</p>
-              <p class="unites-sub">Un administrateur doit valider votre compte avant que vous puissiez recevoir des courses.</p>
+        <Transition name="alerte-pop">
+          <div class="unites-bar validation-attente" v-if="!estValidee">
+            <span class="validation-shine"></span>
+            <div class="unites-left">
+              <span class="unites-icon icon-sablier">⏳</span>
+              <div>
+                <p class="unites-title">Compte en attente de validation</p>
+                <p class="unites-sub">Un administrateur doit valider votre compte avant que vous puissiez recevoir des courses.</p>
+              </div>
             </div>
           </div>
-        </div>
+        </Transition>
 
         <!-- UNITÉS -->
         <div class="unites-bar" :class="{ active: unitesActives }">
@@ -677,6 +680,44 @@ async function terminerCourse() {
 /* UNITÉS */
 .unites-bar { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .unites-bar.active { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.3); }
+.unites-bar.validation-attente {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fff7e0, #fde9b8);
+  border: 1px solid #fde68a;
+  color: #92400e;
+  box-shadow: 0 0 0 0 rgba(217,119,6,0.35);
+  animation: pulseGlow 2.6s ease-in-out infinite;
+}
+.unites-bar.validation-attente .unites-sub { color: #92400e; opacity: 0.85; }
+.icon-sablier { display: inline-block; animation: sablierTourne 2.4s ease-in-out infinite; }
+.validation-shine {
+  position: absolute;
+  top: 0; left: -60%;
+  width: 45%; height: 100%;
+  background: linear-gradient(115deg, transparent, rgba(255,255,255,0.55), transparent);
+  animation: shineSweep 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217,119,6,0.25); }
+  50% { box-shadow: 0 0 0 6px rgba(217,119,6,0); }
+}
+@keyframes sablierTourne {
+  0%, 15% { transform: rotate(0deg); }
+  50% { transform: rotate(180deg); }
+  85%, 100% { transform: rotate(180deg); }
+}
+@keyframes shineSweep {
+  0% { left: -60%; }
+  60%, 100% { left: 130%; }
+}
+
+.alerte-pop-enter-active { transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.alerte-pop-enter-from { opacity: 0; transform: translateY(-12px) scale(0.96); }
+.alerte-pop-leave-active { transition: all 0.3s ease; }
+.alerte-pop-leave-to { opacity: 0; transform: translateY(-8px) scale(0.97); }
 .unites-left { display: flex; align-items: center; gap: 12px; }
 .unites-icon { font-size: 22px; }
 .unites-title { font-size: 14px; font-weight: 600; margin: 0 0 2px; }
