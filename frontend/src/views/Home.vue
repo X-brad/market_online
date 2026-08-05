@@ -151,23 +151,32 @@
         <div class="devenir-grid">
 
           <!-- DÉMO PARCOURS RÉEL -->
-          <div class="demo-phone">
-            <div class="demo-notch"></div>
-            <Transition name="demo-swap" mode="out-in">
-              <div class="demo-etape" :key="etapeDemoActuelle.cle">
-                <div class="demo-icon-wrap">
-                  <svg class="timer-ring" viewBox="0 0 44 44" :key="timerRingKey">
-                    <circle class="ring-bg" cx="22" cy="22" r="19" />
-                    <circle class="ring-fg" cx="22" cy="22" r="19" />
-                  </svg>
-                  <span class="demo-icon">{{ etapeDemoActuelle.icon }}</span>
+          <div class="demo-phone-wrap">
+            <div class="demo-phone">
+              <div class="demo-progress-row">
+                <div class="demo-progress-seg" v-for="(e, i) in etapesDemo" :key="e.cle">
+                  <div
+                    class="demo-progress-fill"
+                    :class="{ filled: i < etapeDemoIndex }"
+                    :key="i === etapeDemoIndex ? 'live-' + timerRingKey : 'static-' + i"
+                    :style="i === etapeDemoIndex ? { animation: 'progressFill ' + DUREE_ETAPE_DEMO + 'ms linear forwards' } : {}"
+                  ></div>
                 </div>
-                <p class="demo-titre">{{ etapeDemoActuelle.titre }}</p>
-                <p class="demo-texte">{{ etapeDemoActuelle.texte }}</p>
               </div>
-            </Transition>
-            <div class="demo-dots">
-              <span v-for="(e, i) in etapesDemo" :key="e.cle" :class="{ active: i === etapeDemoIndex }"></span>
+              <Transition name="demo-swap" mode="out-in">
+                <div
+                  class="demo-etape-photo"
+                  :key="etapeDemoActuelle.cle"
+                  :style="{ backgroundImage: 'url(' + etapeDemoActuelle.image + ')' }"
+                >
+                  <div class="demo-scrim"></div>
+                  <span class="demo-badge-float">{{ etapeDemoActuelle.icon }}</span>
+                  <div class="demo-texte-bas">
+                    <p class="demo-titre">{{ etapeDemoActuelle.titre }}</p>
+                    <p class="demo-texte">{{ etapeDemoActuelle.texte }}</p>
+                  </div>
+                </div>
+              </Transition>
             </div>
             <p class="demo-legende">↑ Aperçu réel de l'expérience coursière</p>
           </div>
@@ -316,10 +325,10 @@ const tarifsCoursiere = ref({ unitePrixStandardVendeuse: 500, unitePrixPremiumVe
 const profilActif = ref('standard')
 
 const etapesDemo = [
-  { cle: 'notif', icon: '🔔', titre: 'Nouvelle course disponible', texte: "Marché d'Adjamé · 2,5 km" },
-  { cle: 'acceptee', icon: '✅', titre: 'Course acceptée', texte: 'Cliente : Fatou D. · Liste reçue' },
-  { cle: 'route', icon: '🛵', titre: 'En route vers le marché', texte: 'Position GPS partagée en direct' },
-  { cle: 'gain', icon: '💰', titre: 'Course livrée', texte: 'Gain crédité sur votre compte' }
+  { cle: 'notif', icon: '🔔', titre: 'Nouvelle course disponible', texte: "Marché d'Adjamé · 2,5 km", image: 'https://images.unsplash.com/photo-1653762379954-8943c787e78b?w=500&h=650&fit=crop&q=80' },
+  { cle: 'acceptee', icon: '✅', titre: 'Course acceptée', texte: 'Cliente : Fatou D. · Liste reçue', image: 'https://images.unsplash.com/photo-1758600587355-fb8e9d5db5db?w=500&h=650&fit=crop&crop=focalpoint&fp-x=0.35&fp-y=0.5&q=80' },
+  { cle: 'route', icon: '🛵', titre: 'En route vers le marché', texte: 'Position GPS partagée en direct', image: 'https://images.unsplash.com/photo-1653725565489-dfddc2b4cbf0?w=500&h=650&fit=crop&q=80' },
+  { cle: 'gain', icon: '💰', titre: 'Course livrée', texte: 'Gain crédité sur votre compte', image: 'https://images.unsplash.com/photo-1743807059700-1d4d97003972?w=500&h=650&fit=crop&q=80' }
 ]
 const etapeDemoIndex = ref(0)
 const etapeDemoActuelle = computed(() => etapesDemo[etapeDemoIndex.value])
@@ -623,43 +632,46 @@ const whys = [
 .devenir-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 860px; margin: 0 auto; align-items: stretch; }
 @media (max-width: 760px) { .devenir-grid { grid-template-columns: 1fr; } }
 
-/* Démo téléphone */
+/* Démo téléphone — photo plein cadre façon story */
+.demo-phone-wrap { display: flex; flex-direction: column; align-items: center; }
 .demo-phone {
-  background: linear-gradient(160deg, var(--vert-dark) 0%, var(--vert) 100%);
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
   border-radius: 26px;
-  padding: 28px 24px 22px;
-  color: white;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(29,158,117,0.22);
+  background: linear-gradient(160deg, var(--vert-dark) 0%, var(--vert) 100%);
+}
+.demo-progress-row { position: absolute; top: 14px; left: 14px; right: 14px; display: flex; gap: 6px; z-index: 3; }
+.demo-progress-seg { flex: 1; height: 3px; border-radius: 3px; background: rgba(255,255,255,0.35); overflow: hidden; }
+.demo-progress-fill { height: 100%; width: 0%; background: white; border-radius: 3px; }
+.demo-progress-fill.filled { width: 100%; }
+@keyframes progressFill { from { width: 0%; } to { width: 100%; } }
+.demo-etape-photo {
+  position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  box-shadow: 0 16px 40px rgba(29,158,117,0.22);
-  position: relative;
-  min-height: 320px;
-  justify-content: center;
+  justify-content: flex-end;
 }
-.demo-notch { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 46px; height: 5px; border-radius: 6px; background: rgba(255,255,255,0.25); }
-.demo-etape { display: flex; flex-direction: column; align-items: center; }
-.demo-icon-wrap { position: relative; width: 66px; height: 66px; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; }
-.timer-ring { position: absolute; inset: 0; width: 100%; height: 100%; }
-.ring-bg { fill: none; stroke: rgba(255,255,255,0.2); stroke-width: 2.5; }
-.ring-fg {
-  fill: none; stroke: white; stroke-width: 2.5; stroke-linecap: round;
-  stroke-dasharray: 119.4; stroke-dashoffset: 119.4;
-  transform: rotate(-90deg); transform-origin: 50% 50%;
-  animation: ringFill 3.2s linear forwards;
+.demo-scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.2) 48%, transparent 72%);
 }
-@keyframes ringFill { to { stroke-dashoffset: 0; } }
-.demo-icon { font-size: 26px; }
-.demo-titre { font-size: 16px; font-weight: 700; margin: 0 0 6px; }
-.demo-texte { font-size: 13px; opacity: 0.8; margin: 0; }
-.demo-swap-enter-active, .demo-swap-leave-active { transition: all 0.35s ease; }
-.demo-swap-enter-from { opacity: 0; transform: translateY(8px) scale(0.97); }
-.demo-swap-leave-to { opacity: 0; transform: translateY(-8px) scale(0.97); }
-.demo-dots { display: flex; gap: 6px; margin-top: 22px; }
-.demo-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); transition: all 0.3s ease; }
-.demo-dots span.active { background: white; width: 18px; border-radius: 4px; }
-.demo-legende { font-size: 11px; opacity: 0.6; margin: 14px 0 0; }
+.demo-badge-float {
+  position: absolute; top: 32px; right: 16px; z-index: 2;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: white; display: flex; align-items: center; justify-content: center;
+  font-size: 19px; box-shadow: 0 4px 12px rgba(0,0,0,0.28);
+}
+.demo-texte-bas { position: relative; z-index: 2; padding: 20px; color: white; text-align: left; }
+.demo-titre { font-size: 17px; font-weight: 800; margin: 0 0 4px; }
+.demo-texte { font-size: 13px; opacity: 0.85; margin: 0; }
+.demo-swap-enter-active, .demo-swap-leave-active { transition: opacity 0.35s ease; }
+.demo-swap-enter-from, .demo-swap-leave-to { opacity: 0; }
+.demo-legende { font-size: 11px; color: var(--texte-sec); margin: 14px 0 0; }
 
 /* Carte tarifs */
 .tarifs-card {
