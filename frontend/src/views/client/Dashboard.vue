@@ -196,6 +196,7 @@
           </div>
         </div>
         <div class="action-row">
+          <button class="btn-back" @click="etape = 0.5">← Retour</button>
          <button class="btn-next" :disabled="!liste.trim() || !marcheChoisi" @click="publierDemande">
             Rechercher une coursière →
       </button>
@@ -259,9 +260,6 @@
                   <span class="tchat-note">⭐ {{ coursiereChos?.note }}</span>
                   <span class="tchat-type-badge" :class="coursiereChos?.type?.toLowerCase()">{{ coursiereChos?.type }}</span>
                 </div>
-              </div>
-              <div class="quick-actions">
-                <button class="quick-btn" @click="envoyerListe">📋 Envoyer ma liste</button>
               </div>
               <div class="tchat-messages" ref="messagesEl">
                 <div v-for="(msg, i) in messages" :key="i" class="message" :class="msg.from">
@@ -741,6 +739,7 @@ async function publierDemande() {
       enAttenteAssignation.value = false
       etape.value = 3
       toast.success(`${coursiereChos.value.nom} a accepté votre commande !`)
+      envoyerListe()
       nextTick(() => initCarte())
     })
 
@@ -1131,9 +1130,6 @@ function nouvelleCommande() {
 .tchat-type-badge { padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 .tchat-type-badge.premium { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; }
 .tchat-type-badge.standard { background: var(--vert-light); color: var(--vert-dark); }
-.quick-actions { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 0.5px solid var(--bordure); flex-wrap: wrap; background: var(--fond); }
-.quick-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--bordure); background: white; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--texte); transition: all 0.2s; }
-.quick-btn:hover { border-color: var(--vert); color: var(--vert); background: var(--vert-light); }
 .tchat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #f8faf9; }
 .message { display: flex; flex-direction: column; }
 .message.client { align-items: flex-end; }

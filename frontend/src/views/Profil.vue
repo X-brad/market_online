@@ -2,6 +2,9 @@
   <div class="profil-page">
     <div class="container">
 
+      <!-- RETOUR -->
+      <RouterLink :to="authStore.getDashboardRoute()" class="lien-retour">← Retour au dashboard</RouterLink>
+
       <!-- HEADER -->
       <div class="profil-header">
         <div class="profil-avatar-big">{{ initiales }}</div>
@@ -286,6 +289,16 @@ function supprimerCompte() {
 
 <style scoped>
 .profil-page { padding: 40px 0 60px; background: var(--fond); min-height: 100vh; }
+.lien-retour {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texte-sec);
+  text-decoration: none;
+  margin-bottom: 16px;
+  transition: color 0.2s;
+}
+.lien-retour:hover { color: var(--vert-dark); }
 
 /* HEADER */
 .profil-header {
