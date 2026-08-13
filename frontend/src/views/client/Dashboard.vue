@@ -196,64 +196,44 @@
           </div>
         </div>
         <div class="action-row">
-         <button class="btn-next" :disabled="!liste.trim() || !marcheChoisi" @click="etape = 2; chargerCoursieres()">
+         <button class="btn-next" :disabled="!liste.trim() || !marcheChoisi" @click="publierDemande">
             Rechercher une coursière →
       </button>
         </div>
       </div>
 
- <!-- ÉTAPE 2 : COURSIÈRES DISPONIBLES -->
+ <!-- ÉTAPE 2 : RECHERCHE DE COURSIÈRE -->
 <div v-if="etape === 2">
   <div class="section-title">
     <span class="step-tag">Étape 2</span>
-    <h2>Coursières disponibles</h2>
-    <p>Votre demande sera proposée automatiquement à la coursière disponible la plus proche du <strong>{{ marcheChoisi }}</strong>. Si elle ne répond pas, elle sera proposée à la suivante — vous ne choisissez pas vous-même.</p>
+    <h2>{{ aucuneCoursiereDisponible ? 'Aucune coursière disponible' : 'Recherche de votre coursière' }}</h2>
+    <p v-if="!aucuneCoursiereDisponible">Nous proposons votre demande à la coursière disponible la plus proche, une par une, jusqu'à ce que l'une l'accepte.</p>
   </div>
 
-  <!-- CHARGEMENT -->
-  <div class="chargement" v-if="chargementCoursieres">
-    <div class="spinner"></div>
-    <p>Recherche de coursières disponibles...</p>
+  <!-- RECHERCHE EN COURS -->
+  <div class="recherche-card" v-if="!aucuneCoursiereDisponible">
+    <div class="recherche-radar">
+      <span class="radar-ring r1"></span>
+      <span class="radar-ring r2"></span>
+      <span class="radar-ring r3"></span>
+      <span class="recherche-icon">🔍</span>
+    </div>
+    <h3>Recherche en cours<span class="dots"><span>.</span><span>.</span><span>.</span></span></h3>
+    <Transition name="statut-swap" mode="out-in">
+      <p class="recherche-statut" :key="statutRechercheIndex">{{ statutsRecherche[statutRechercheIndex] }}</p>
+    </Transition>
+    <p class="recherche-chrono">⏱ {{ chronoRecherche }}s</p>
+    <button class="btn-back" @click="etape = 1">← Annuler</button>
   </div>
 
   <!-- AUCUNE COURSIÈRE -->
-  <div class="empty-coursieres" v-else-if="coursieres.length === 0">
-    <span>👩🏾</span>
-    <p>Aucune coursière disponible pour l'instant</p>
-    <button class="btn-back" @click="etape = 1">← Retour</button>
-  </div>
-
-  <!-- LISTE COURSIÈRES -->
-  <div v-else>
-    <div class="coursieres-grid">
-      <div
-        v-for="c in coursieres"
-        :key="c._id"
-        class="coursiere-card"
-        :class="{ occupee: c.statut === 'occupee' }"
-      >
-        <div class="coursiere-top">
-          <div class="coursiere-avatar">{{ c.initiales }}</div>
-          <div class="coursiere-info">
-            <p class="coursiere-nom">{{ c.nom }}</p>
-            <p class="coursiere-detail">{{ c.marche }} · {{ c.type }}</p>
-          </div>
-          <span class="statut-badge" :class="c.statut">
-            {{ c.statut === 'disponible' ? 'Dispo' : 'Occupée' }}
-          </span>
-        </div>
-        <div class="coursiere-stats">
-          <span>⭐ {{ c.note }}</span>
-          <span>🛒 {{ c.courses }} courses</span>
-          <span>📍 {{ c.distance }}</span>
-        </div>
-      </div>
-    </div>
-    <div class="action-row">
+  <div class="recherche-card echec" v-else>
+    <span class="echec-icon">😔</span>
+    <h3>Aucune coursière disponible</h3>
+    <p>Personne n'est disponible pour l'instant. Réessayez dans quelques instants.</p>
+    <div class="action-row" style="justify-content:center">
       <button class="btn-back" @click="etape = 1">← Retour</button>
-      <button class="btn-next" @click="publierDemande">
-        Publier ma demande →
-      </button>
+      <button class="btn-next" @click="reessayerRecherche">Réessayer</button>
     </div>
   </div>
 </div>
@@ -262,28 +242,11 @@
       <div v-if="etape === 3" class="tchat-page">
         <div class="section-title">
           <span class="step-tag">Étape 3</span>
-          <h2>{{ enAttenteAssignation ? 'Recherche d\'une coursière...' : 'Discussion avec ' + coursiereChos?.nom }}</h2>
-          <p>{{ enAttenteAssignation ? 'Votre demande a été envoyée, en attente qu\'une coursière l\'accepte' : 'Partagez votre liste, convenez des frais avant de payer' }}</p>
+          <h2>Discussion avec {{ coursiereChos?.nom }}</h2>
+          <p>Partagez votre liste, convenez des frais avant de payer</p>
         </div>
 
-        <!-- EN ATTENTE D'UNE COURSIÈRE -->
-        <div class="chargement" v-if="enAttenteAssignation && !aucuneCoursiereDisponible">
-          <div class="spinner"></div>
-          <p>Recherche d'une coursière disponible au {{ marcheChoisi }}...</p>
-          <button class="btn-back" @click="etape = 2">← Annuler</button>
-        </div>
-
-        <!-- AUCUNE COURSIÈRE DISPONIBLE -->
-        <div class="chargement" v-if="aucuneCoursiereDisponible">
-          <span style="font-size:40px;display:block;margin-bottom:12px">😔</span>
-          <p>Aucune coursière disponible pour le moment.</p>
-          <div class="action-row" style="justify-content:center">
-            <button class="btn-back" @click="etape = 2">← Retour</button>
-            <button class="btn-next" @click="reessayerRecherche">Réessayer</button>
-          </div>
-        </div>
-
-        <div class="tchat-layout" v-if="!enAttenteAssignation && !aucuneCoursiereDisponible">
+        <div class="tchat-layout">
           <div class="tchat-main">
             <div class="card tchat-card">
               <div class="tchat-header">
@@ -513,6 +476,37 @@ const enAttenteAssignation = ref(false)
 const courseId = ref(null)
 const historiqueCommandes = ref([])
 
+// ── Animation de la recherche de coursière (étape 2) ──
+const statutsRecherche = [
+  'Localisation des coursières à proximité…',
+  'Vérification de leur disponibilité…',
+  'Envoi de votre demande…',
+  'En attente d\'une réponse…'
+]
+const statutRechercheIndex = ref(0)
+const chronoRecherche = ref(0)
+let statutRechercheInterval = null
+let chronoRechercheInterval = null
+
+function demarrerAnimationRecherche() {
+  arreterAnimationRecherche()
+  statutRechercheIndex.value = 0
+  chronoRecherche.value = 0
+  statutRechercheInterval = setInterval(() => {
+    statutRechercheIndex.value = (statutRechercheIndex.value + 1) % statutsRecherche.length
+  }, 2600)
+  chronoRechercheInterval = setInterval(() => {
+    chronoRecherche.value++
+  }, 1000)
+}
+
+function arreterAnimationRecherche() {
+  clearInterval(statutRechercheInterval)
+  clearInterval(chronoRechercheInterval)
+  statutRechercheInterval = null
+  chronoRechercheInterval = null
+}
+
 async function chargerHistorique() {
   try {
     const res = await api.get('/courses/mes-courses')
@@ -581,6 +575,7 @@ onUnmounted(() => {
   socket.off('position_maj')
   if (socket.connected) socket.disconnect()
   detruireCarte()
+  arreterAnimationRecherche()
 })
 
 const initiales = computed(() => {
@@ -616,28 +611,6 @@ const marches = ref([])
 const marchesFiltres = computed(() => marches.value.filter(m => m.commune === communeSelectionnee.value))
 const communesDisponibles = computed(() => [...new Set(marches.value.map(m => m.commune))])
 
-const coursieres = ref([])
-const chargementCoursieres = ref(false)
-async function chargerCoursieres() {
-  if (chargementCoursieres.value) return
-  coursieres.value = []
-  chargementCoursieres.value = true
-  try {
-    const res = await api.get('/coursiere/disponibles', {
-      params: { commune: communeSelectionnee.value, marche: marcheChoisi.value }
-    })
-    coursieres.value = res.data.coursieres
-    if (coursieres.value.length === 0) {
-      toast.warning('Aucune coursière disponible pour l\'instant')
-    } else {
-      toast.info(`${coursieres.value.length} coursière(s) disponible(s)`)
-    }
-  } catch (err) {
-    toast.error('Erreur lors du chargement des coursières')
-  } finally {
-    chargementCoursieres.value = false
-  }
-}
 const messages = ref([])
 
 function getTime(date) {
@@ -740,6 +713,7 @@ async function publierDemande() {
     coursiereChos.value = null
     enAttenteAssignation.value = true
     aucuneCoursiereDisponible.value = false
+    demarrerAnimationRecherche()
     budgetValide.value = false
     budgetInput.value = null
     budgetCourses.value = null
@@ -762,8 +736,10 @@ async function publierDemande() {
     socket.off('position_maj')
 
     socket.on('course_assignee', ({ course }) => {
+      arreterAnimationRecherche()
       coursiereChos.value = mapCoursiereUser(course.coursiere)
       enAttenteAssignation.value = false
+      etape.value = 3
       toast.success(`${coursiereChos.value.nom} a accepté votre commande !`)
       nextTick(() => initCarte())
     })
@@ -786,6 +762,7 @@ async function publierDemande() {
     })
 
     socket.on('dispatching_epuise', () => {
+      arreterAnimationRecherche()
       enAttenteAssignation.value = false
       aucuneCoursiereDisponible.value = true
     })
@@ -794,7 +771,7 @@ async function publierDemande() {
       majPositionCoursiereCarte(lat, lng)
     })
 
-    etape.value = 3
+    etape.value = 2
     toast.success('Demande publiée ! En attente qu\'une coursière l\'accepte...')
   } catch (err) {
     toast.error('Erreur lors de la création de la course')
@@ -930,6 +907,7 @@ function nouvelleCommande() {
   noteEnvoyee.value = false
   if (socket.connected) socket.disconnect()
   detruireCarte()
+  arreterAnimationRecherche()
   chargerHistorique()
 }
 </script>
@@ -941,9 +919,6 @@ function nouvelleCommande() {
 .spinner { width: 40px; height: 40px; border: 3px solid var(--bordure); border-top-color: var(--vert); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .chargement p { font-size: 14px; color: var(--texte-sec); }
-.empty-coursieres { text-align: center; padding: 48px; }
-.empty-coursieres span { font-size: 48px; display: block; margin-bottom: 12px; }
-.empty-coursieres p { font-size: 15px; color: var(--texte-sec); margin-bottom: 20px; }
 
 
 .dashboard { padding: 0 0 60px; background: var(--fond); min-height: 100vh; }
@@ -1099,18 +1074,47 @@ function nouvelleCommande() {
 .marche-check { margin-left: auto; color: var(--vert); font-weight: 700; font-size: 16px; }
 
 /* COURSIÈRES */
-.coursieres-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 20px; }
-.coursiere-card { background: white; border-radius: 14px; padding: 18px; border: 1.5px solid var(--bordure); }
-.coursiere-card.occupee { opacity: 0.5; cursor: not-allowed; }
-.coursiere-top { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .coursiere-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--vert); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
 .coursiere-avatar.sm { width: 36px; height: 36px; font-size: 13px; }
-.coursiere-nom { font-size: 14px; font-weight: 700; margin: 0 0 2px; color: var(--texte); }
-.coursiere-detail { font-size: 12px; color: var(--texte-sec); margin: 0; }
-.statut-badge { margin-left: auto; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
-.statut-badge.disponible { background: #dcfce7; color: #166534; }
-.statut-badge.occupee { background: #fef2f2; color: #dc2626; }
-.coursiere-stats { display: flex; gap: 10px; font-size: 12px; color: var(--texte-sec); flex-wrap: wrap; }
+
+/* RECHERCHE DE COURSIÈRE */
+.recherche-card {
+  max-width: 460px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 20px;
+  padding: 40px 32px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--bordure);
+}
+.recherche-radar { position: relative; width: 90px; height: 90px; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; }
+.radar-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--vert); animation: rechercheSweep 2.2s ease-out infinite; }
+.radar-ring.r2 { animation-delay: 0.7s; }
+.radar-ring.r3 { animation-delay: 1.4s; }
+@keyframes rechercheSweep { 0% { transform: scale(0.6); opacity: 0.7; } 100% { transform: scale(1.8); opacity: 0; } }
+.recherche-icon {
+  position: relative; z-index: 1;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--vert-light); color: var(--vert-dark);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  animation: rechercheBob 1.8s ease-in-out infinite;
+}
+@keyframes rechercheBob { 0%, 100% { transform: rotate(-8deg) scale(1); } 50% { transform: rotate(8deg) scale(1.08); } }
+.recherche-card h3 { font-size: 19px; font-weight: 800; color: var(--texte); margin: 0 0 8px; display: flex; align-items: center; justify-content: center; gap: 2px; }
+.recherche-card p { font-size: 14px; color: var(--texte-sec); margin: 0 0 6px; line-height: 1.6; }
+.dots { display: inline-flex; }
+.dots span { animation: dotFade 1.4s infinite; opacity: 0; }
+.dots span:nth-child(2) { animation-delay: 0.2s; }
+.dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotFade { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+.recherche-statut { min-height: 20px; font-weight: 500; }
+.statut-swap-enter-active, .statut-swap-leave-active { transition: opacity 0.3s ease, transform 0.3s ease; }
+.statut-swap-enter-from { opacity: 0; transform: translateY(6px); }
+.statut-swap-leave-to { opacity: 0; transform: translateY(-6px); }
+.recherche-chrono { font-size: 12px; color: var(--texte-sec); opacity: 0.7; margin: 0 0 24px; font-variant-numeric: tabular-nums; }
+.recherche-card.echec .echec-icon { font-size: 44px; display: block; margin-bottom: 12px; }
 
 /* TCHAT LAYOUT */
 .tchat-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; margin-bottom: 16px; }

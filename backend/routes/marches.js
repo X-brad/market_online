@@ -12,7 +12,11 @@ const MARCHES_INITIAUX = [
   { nom: "Marché d'Adjamé", commune: 'Adjamé', icon: '🏪', lat: 5.3667, lng: -4.0167 },
   { nom: 'Marché de Treichville', commune: 'Treichville', icon: '🛒', lat: 5.2926, lng: -4.0114 },
   { nom: 'Marché de Koumassi', commune: 'Koumassi', icon: '🏪', lat: 5.2926, lng: -3.9531 },
-  { nom: 'Marché de Bingerville', commune: 'Bingerville', icon: '🛒', lat: 5.3556, lng: -3.8894 }
+  { nom: 'Marché de Bingerville', commune: 'Bingerville', icon: '🛒', lat: 5.3556, lng: -3.8894 },
+  { nom: 'Marché de Marcory', commune: 'Marcory', icon: '🏪', lat: 5.2926, lng: -3.9819 },
+  { nom: 'Marché du Plateau', commune: 'Plateau', icon: '🛒', lat: 5.3197, lng: -4.0227 },
+  { nom: 'Marché de Yopougon', commune: 'Yopougon', icon: '🏪', lat: 5.3450, lng: -4.0850 },
+  { nom: "Marché Gouro d'Abobo", commune: 'Abobo', icon: '🛒', lat: 5.4181, lng: -4.0154 }
 ]
 
 async function assurerMarchesInitiaux() {
@@ -21,9 +25,12 @@ async function assurerMarchesInitiaux() {
     await Marche.insertMany(MARCHES_INITIAUX)
     return
   }
-  // Complète les coordonnées des marchés déjà existants qui n'en ont pas encore
+  // Complète les coordonnées des marchés déjà existants qui n'en ont pas encore,
+  // et ajoute les marchés initiaux qui n'existent pas encore en base
   for (const m of MARCHES_INITIAUX) {
     await Marche.updateOne({ nom: m.nom, lat: null }, { $set: { lat: m.lat, lng: m.lng } })
+    const existe = await Marche.exists({ nom: m.nom })
+    if (!existe) await Marche.create(m)
   }
 }
 
