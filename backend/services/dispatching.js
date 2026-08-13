@@ -34,15 +34,17 @@ async function calculerCandidats(course) {
       distance = distanceKm(marche.lat, marche.lng, c.coursiere.position.lat, c.coursiere.position.lng)
     }
 
-    return { id: c._id, distance, coursesAujourdhui }
+    return { id: c._id, distance, coursesAujourdhui, quotaJournalier: c.coursiere?.quotaJournalier ?? 10 }
   }))
 
-  scores.sort((a, b) => {
+  const disponibles = scores.filter(s => s.coursesAujourdhui < s.quotaJournalier)
+
+  disponibles.sort((a, b) => {
     if (a.distance !== b.distance) return a.distance - b.distance
     return a.coursesAujourdhui - b.coursesAujourdhui
   })
 
-  return scores.map(s => s.id)
+  return disponibles.map(s => s.id)
 }
 
 async function demarrerDispatching(courseId) {
