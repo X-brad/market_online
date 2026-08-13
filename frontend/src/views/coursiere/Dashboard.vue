@@ -421,8 +421,11 @@ const historique = ref([])
 const mesCoursesRaw = ref([])
 
 const coursesAujourdhuiCalcule = computed(() => {
-  const aujourdhui = new Date().toDateString()
-  return mesCoursesRaw.value.filter(c => new Date(c.createdAt).toDateString() === aujourdhui).length
+  const debutJour = new Date()
+  debutJour.setHours(0, 0, 0, 0)
+  const quotaDepuis = authStore.user?.coursiere?.quotaDepuis ? new Date(authStore.user.coursiere.quotaDepuis) : null
+  const debutFenetre = quotaDepuis && quotaDepuis > debutJour ? quotaDepuis : debutJour
+  return mesCoursesRaw.value.filter(c => new Date(c.createdAt) >= debutFenetre).length
 })
 
 const parametresTarifs = ref({
@@ -613,7 +616,7 @@ async function acheterUnites() {
     quotaJournalier.value = res.data.quota || (uniteChoisie.value === 'Premium' ? 15 : 10)
     statut.value = 'disponible'
     showUnites.value = false
-    toast.success('Unités activées, vous êtes maintenant disponible !')
+    toast.success(`Unités activées ! Quota du jour remis à 0/${res.data.quota} courses.`)
     demarrerSuiviPosition()
     chargerProfil()
   } catch (err) {

@@ -24,6 +24,7 @@ const UserSchema = new mongoose.Schema({
     unitesExpiration: { type: Date },
     coursesAujourdhui: { type: Number, default: 0 },
     quotaJournalier: { type: Number, default: 10 },
+    quotaDepuis: { type: Date, default: null },
     note: { type: Number, default: 0 },
     nombreAvis: { type: Number, default: 0 },
     valide: { type: Boolean, default: false },

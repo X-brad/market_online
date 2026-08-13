@@ -3,6 +3,7 @@ const Course = require('../models/Course')
 const Marche = require('../models/Marche')
 const { distanceKm } = require('../utils/geo')
 const { communeRegex } = require('../utils/text')
+const { debutFenetreQuota } = require('../utils/quota')
 const { getIO } = require('../socket')
 
 const DELAI_OFFRE_MS = 20000
@@ -20,13 +21,10 @@ async function calculerCandidats(course) {
     'coursiere.valide': true
   })
 
-  const debutJour = new Date()
-  debutJour.setHours(0, 0, 0, 0)
-
   const scores = await Promise.all(candidates.map(async (c) => {
     const coursesAujourdhui = await Course.countDocuments({
       coursiere: c._id,
-      createdAt: { $gte: debutJour }
+      createdAt: { $gte: debutFenetreQuota(c.coursiere) }
     })
 
     let distance = Infinity

@@ -168,13 +168,19 @@ router.put('/unites', proteger, autoriser('coursiere'), async (req, res) => {
     const prix = type === 'premium'
       ? (estVendeuse ? settings.unitePrixPremiumVendeuse : settings.unitePrixPremiumNonVendeuse)
       : (estVendeuse ? settings.unitePrixStandardVendeuse : settings.unitePrixStandardNonVendeuse)
-    const expiration = new Date()
-    expiration.setHours(23, 59, 59, 999)
 
+    const finJour = new Date()
+    finJour.setHours(23, 59, 59, 999)
+    const maintenant = new Date()
+
+    // Chaque paiement fait repartir son quota à 0/X immédiatement (même en plein
+    // milieu de journée, même si elle avait déjà atteint son quota précédent),
+    // au lieu d'attendre le reset naturel de minuit.
     await User.findByIdAndUpdate(req.user._id, {
       'coursiere.unitesActives': true,
-      'coursiere.unitesExpiration': expiration,
+      'coursiere.unitesExpiration': finJour,
       'coursiere.quotaJournalier': quota,
+      'coursiere.quotaDepuis': maintenant,
       'coursiere.typeProfile': type,
       'coursiere.statut': 'disponible'
     })

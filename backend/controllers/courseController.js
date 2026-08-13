@@ -5,11 +5,10 @@ const User = require('../models/User')
 const Settings = require('../models/Settings')
 const { getIO } = require('../socket')
 const { demarrerDispatching, passerAuSuivant, annulerMinuteur } = require('../services/dispatching')
+const { debutFenetreQuota } = require('../utils/quota')
 
-async function coursesAujourdhui(coursiereId) {
-  const debutJour = new Date()
-  debutJour.setHours(0, 0, 0, 0)
-  return Course.countDocuments({ coursiere: coursiereId, createdAt: { $gte: debutJour } })
+async function coursesAujourdhui(coursiereId, coursiere) {
+  return Course.countDocuments({ coursiere: coursiereId, createdAt: { $gte: debutFenetreQuota(coursiere) } })
 }
 
 // POST /api/courses — Créer une course
@@ -88,7 +87,7 @@ exports.accepterCourse = async (req, res) => {
 
     // Vérifier quota journalier (calculé en direct, pas un compteur qui ne se remet jamais à zéro)
     const coursiere = await User.findById(req.user._id)
-    const dejaAujourdhui = await coursesAujourdhui(req.user._id)
+    const dejaAujourdhui = await coursesAujourdhui(req.user._id, coursiere.coursiere)
     if (dejaAujourdhui >= coursiere.coursiere.quotaJournalier) {
       return res.status(400).json({ succes: false, message: 'Quota journalier atteint' })
     }
