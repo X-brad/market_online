@@ -114,17 +114,42 @@
             <h3>Course en cours</h3>
             <p>{{ courseEnCours.marche }} · Client : {{ clientNom }}</p>
           </div>
-          <span class="encours-badge" v-if="!paiementRecu">En cours</span>
+          <span class="encours-badge attente-paiement" v-if="!paiementRecu">⏳ Paiement en attente</span>
           <span class="encours-badge paye" v-else>✅ Payé</span>
         </div>
-        <div class="liste-courses">
-          <p class="liste-title">📋 Liste du client :</p>
-          <p class="liste-content">{{ courseEnCours.liste }}</p>
+
+        <!-- FANFARE PAIEMENT REÇU -->
+        <Transition name="alerte-pop">
+          <div class="fanfare-bar" v-if="paiementFanfare">
+            <span class="icon-sablier">💰</span>
+            <span>Paiement reçu ! Cherchez un livreur Yango Moto pour {{ clientNom }}.</span>
+          </div>
+        </Transition>
+
+        <!-- GAINS CONFIRMÉS -->
+        <Transition name="alerte-pop">
+          <div class="fanfare-bar gains" v-if="gainsConfirmes">
+            <span class="icon-sablier">🎉</span>
+            <span>{{ clientNom }} a confirmé la réception ! <strong>{{ gainsConfirmes.montant }} F</strong> ajoutés à vos gains.</span>
+          </div>
+        </Transition>
+
+        <!-- INCITATION À TCHATER -->
+        <div class="chat-nudge" v-if="!showTchat && !chatOuvertUneFois && !gainsConfirmes" @click="showTchat = true; chatOuvertUneFois = true">
+          <span class="chat-nudge-dot"></span>
+          💬 Discutez avec {{ clientNom }} pour convenir des détails et du budget →
         </div>
-        <div class="encours-actions">
-          <button class="btn-tchat" @click="showTchat = true">💬 Contacter le client</button>
-          <button class="btn-terminer" :disabled="livraisonData?.statut !== 'commandee'" @click="(e) => { ripple(e); terminerCourse() }">Livraison effectuée ✓</button>
-        </div>
+
+        <template v-if="!gainsConfirmes">
+          <div class="liste-courses">
+            <p class="liste-title">📋 Liste du client :</p>
+            <p class="liste-content">{{ courseEnCours.liste }}</p>
+          </div>
+          <div class="encours-actions">
+            <button class="btn-tchat" @click="showTchat = true; chatOuvertUneFois = true">💬 Contacter le client</button>
+            <span class="etat-attente-client" v-if="livraisonData?.statut === 'commandee'">⏳ En attente que le client confirme la réception</span>
+          </div>
+        </template>
       </div>
 
       <!-- DEUX COLONNES -->
@@ -580,6 +605,8 @@ onMounted(async () => {
     startTimer(expirationOffre)
   })
 
+  restaurerCourseEnCours()
+
   if (statut.value === 'disponible') demarrerSuiviPosition()
 })
 
@@ -638,6 +665,42 @@ function startTimer(expirationOffre) {
   timerInterval = setInterval(tick, 1000)
 }
 
+function attacherListenersCourse() {
+  socket.off('nouveau_message')
+  socket.off('livraison_maj')
+  socket.off('statut_change')
+
+  socket.on('nouveau_message', (msg) => {
+    messages.value.push(formaterMessage(msg))
+    scrollBottom()
+  })
+
+  socket.on('livraison_maj', ({ course }) => {
+    livraisonData.value = course.livraison
+    if (course.livraison.statut === 'acceptee') toast.success('Le client a accepté la livraison !')
+    if (course.livraison.statut === 'non_demandee') toast.info('Le client souhaite un autre livreur.')
+    if (course.livraison.statut === 'livree') {
+      gainsConfirmes.value = { montant: course.fraisPrestation, marche: course.marche }
+      toast.success(`🎉 ${clientNom.value} a confirmé la réception ! ${course.fraisPrestation} F ajoutés à vos gains.`)
+      showTchat.value = false
+      chargerHistorique()
+      setTimeout(() => {
+        courseEnCours.value = null
+        gainsConfirmes.value = null
+      }, 4500)
+    }
+  })
+
+  socket.on('statut_change', ({ course }) => {
+    if (course.paiementEffectue && !paiementRecu.value) {
+      paiementRecu.value = true
+      toast.success(`💰 Paiement reçu ! Cherchez un livreur Yango Moto pour ${clientNom.value}.`)
+      paiementFanfare.value = true
+      setTimeout(() => { paiementFanfare.value = false }, 4000)
+    }
+  })
+}
+
 async function accepterCourse() {
   clearInterval(timerInterval)
   const course = nouvelleCourseData.value
@@ -653,30 +716,39 @@ async function accepterCourse() {
     adresseRecherche.value = ''
     rechercheEnCours.value = false
     candidatsLivreurs.value = []
+    chatOuvertUneFois.value = false
+    paiementFanfare.value = false
+    gainsConfirmes.value = null
 
     socket.emit('rejoindre_course', courseEnCours.value._id)
-    socket.off('nouveau_message')
-    socket.off('livraison_maj')
-    socket.off('statut_change')
-
-    socket.on('nouveau_message', (msg) => {
-      messages.value.push(formaterMessage(msg))
-      scrollBottom()
-    })
-
-    socket.on('livraison_maj', ({ course }) => {
-      livraisonData.value = course.livraison
-      if (course.livraison.statut === 'acceptee') toast.success('Le client a accepté la livraison !')
-      if (course.livraison.statut === 'non_demandee') toast.info('Le client souhaite un autre livreur.')
-    })
-
-    socket.on('statut_change', ({ course }) => {
-      if (course.paiementEffectue) paiementRecu.value = true
-    })
+    attacherListenersCourse()
 
     toast.success('Course acceptée ! Vous pouvez contacter le client.')
   } catch (err) {
     toast.error(err.response?.data?.message || 'Cette course n\'est plus disponible')
+  }
+}
+
+async function restaurerCourseEnCours() {
+  const active = mesCoursesRaw.value.find(c => c.statut === 'assignee' || c.statut === 'en_cours')
+  if (!active) return
+
+  courseEnCours.value = active
+  paiementRecu.value = !!active.paiementEffectue
+  livraisonData.value = active.livraison
+  chatOuvertUneFois.value = false
+  paiementFanfare.value = false
+  gainsConfirmes.value = null
+
+  socket.emit('rejoindre_course', active._id)
+  attacherListenersCourse()
+
+  try {
+    const res = await api.get(`/courses/${active._id}/messages`)
+    messages.value = res.data.messages.map(formaterMessage)
+    scrollBottom()
+  } catch (err) {
+    console.error('Erreur messages:', err)
   }
 }
 
@@ -701,6 +773,9 @@ const showRechercheForm = ref(false)
 const adresseRecherche = ref('')
 const rechercheEnCours = ref(false)
 const candidatsLivreurs = ref([])
+const chatOuvertUneFois = ref(false)
+const paiementFanfare = ref(false)
+const gainsConfirmes = ref(null)
 
 const PRENOMS_LIVREURS = ['Ibrahim', 'Moussa', 'Kader', 'Salif', 'Aboubakar', 'Issa', 'Drissa', 'Lassina']
 const NOMS_LIVREURS = ['Traoré', 'Diabaté', 'Koné', 'Ouattara', 'Bamba', 'Coulibaly', 'Sanogo']
@@ -792,24 +867,6 @@ async function commanderLivraison() {
   }
 }
 
-async function terminerCourse() {
-  if (livraisonData.value?.statut !== 'commandee') {
-    toast.warning('Le livreur doit d\'abord être réservé')
-    return
-  }
-  try {
-    await api.put(`/courses/${courseEnCours.value._id}/statut`, { statut: 'livree' })
-    toast.success('Livraison marquée comme terminée !')
-    showTchat.value = false
-    courseEnCours.value = null
-    socket.off('nouveau_message')
-    socket.off('livraison_maj')
-    socket.off('statut_change')
-    chargerHistorique()
-  } catch (err) {
-    toast.error('Erreur lors de la validation de la livraison')
-  }
-}
 </script>
 
 <style scoped>
@@ -920,13 +977,43 @@ async function terminerCourse() {
 .encours-header p { font-size: 13px; color: var(--texte-sec); margin: 0; }
 .encours-badge { margin-left: auto; background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
 .encours-badge.paye { background: #dcfce7; color: #166534; }
+.encours-badge.attente-paiement { animation: pulseGlow 2.6s ease-in-out infinite; }
 .liste-courses { background: var(--fond); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
 .liste-title { font-size: 13px; font-weight: 700; margin: 0 0 6px; color: var(--texte); }
 .liste-content { font-size: 13px; color: var(--texte-sec); margin: 0; line-height: 1.6; }
-.encours-actions { display: flex; gap: 10px; }
+.encours-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .btn-tchat { padding: 12px 20px; border-radius: var(--radius); border: 1.5px solid var(--vert); background: white; color: var(--vert); font-size: 14px; font-weight: 600; cursor: pointer; }
-.btn-terminer { flex: 1; padding: 12px; border-radius: var(--radius); background: var(--vert); color: white; border: none; font-size: 14px; font-weight: 700; cursor: pointer; }
-.btn-terminer:disabled { opacity: 0.4; cursor: not-allowed; }
+.etat-attente-client { font-size: 12px; color: var(--texte-sec); font-style: italic; }
+
+/* INCITATION TCHAT */
+.chat-nudge {
+  position: relative;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--vert-light); color: var(--vert-dark);
+  border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  animation: pulseGlowVert 2.6s ease-in-out infinite;
+  transition: transform 0.15s ease;
+}
+.chat-nudge:hover { transform: translateY(-1px); }
+.chat-nudge-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vert); flex-shrink: 0; animation: ping 1s infinite; }
+
+/* BANDEAUX DE CÉLÉBRATION */
+.fanfare-bar {
+  display: flex; align-items: center; gap: 10px;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  border: 1px solid #6ee7b7; color: #065f46;
+  border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;
+  font-size: 13px; font-weight: 600;
+  animation: pulseGlowVert 2.6s ease-in-out infinite;
+}
+.fanfare-bar .icon-sablier { font-size: 18px; animation: none; }
+.fanfare-bar.gains { background: linear-gradient(135deg, #fef3c7, #fde68a); border-color: #fcd34d; color: #92400e; }
+
+@keyframes pulseGlowVert {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(29,158,117,0.25); }
+  50% { box-shadow: 0 0 0 6px rgba(29,158,117,0); }
+}
 
 /* TWO COL */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 24px; }

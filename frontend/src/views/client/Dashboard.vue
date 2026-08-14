@@ -383,8 +383,12 @@
           <div class="confirm-steps">
             <div class="confirm-step done">✓ Paiement reçu</div>
             <div class="confirm-step" :class="livraisonData.statut === 'commandee' ? 'done' : 'pending'">{{ livraisonData.statut === 'commandee' ? '✓ Livreur réservé' : '⏳ En attente de réservation' }}</div>
-            <div class="confirm-step pending">🏠 Livraison à domicile</div>
+            <div class="confirm-step pending" v-if="livraisonData.statut !== 'commandee'">🏠 Livraison à domicile</div>
           </div>
+          <button class="btn-next btn-confirmer-reception" v-if="livraisonData.statut === 'commandee'" @click="confirmerReception">
+            ✅ J'ai reçu mon colis
+          </button>
+          <p class="confirm-hint" v-if="livraisonData.statut === 'commandee'">Confirmez uniquement une fois le colis remis en main propre.</p>
         </div>
 
         <!-- CONFIRMATION FINALE -->
@@ -558,10 +562,11 @@ async function souscrirePremium() {
   }
 }
 
-onMounted(() => {
-  chargerHistorique()
+onMounted(async () => {
+  await chargerHistorique()
   chargerMarches()
   chargerFraisService()
+  restaurerCommandeEnCours()
 })
 
 onUnmounted(() => {
@@ -699,6 +704,52 @@ function detruireCarte() {
   }
 }
 
+function attacherListenersCommande() {
+  socket.off('nouveau_message')
+  socket.off('course_assignee')
+  socket.off('livraison_maj')
+  socket.off('statut_change')
+  socket.off('dispatching_epuise')
+  socket.off('position_maj')
+
+  socket.on('course_assignee', ({ course }) => {
+    arreterAnimationRecherche()
+    coursiereChos.value = mapCoursiereUser(course.coursiere)
+    enAttenteAssignation.value = false
+    etape.value = 3
+    toast.success(`${coursiereChos.value.nom} a accepté votre commande !`)
+    envoyerListe()
+    nextTick(() => initCarte())
+  })
+
+  socket.on('nouveau_message', (msg) => {
+    messages.value.push(formaterMessage(msg))
+    scrollBottom()
+  })
+
+  socket.on('livraison_maj', ({ course }) => {
+    livraisonData.value = course.livraison
+    if (course.livraison.statut === 'proposee') toast.info('🛵 Un livreur vous a été proposé !')
+    if (course.livraison.statut === 'acceptee') toast.success('Livraison acceptée, en attente de confirmation de la coursière.')
+    if (course.livraison.statut === 'commandee') toast.success('Livreur commandé !')
+  })
+
+  socket.on('statut_change', ({ course }) => {
+    courseStatut.value = course.statut
+    if (course.statut === 'livree') toast.success('Votre commande a été livrée ! 🎉')
+  })
+
+  socket.on('dispatching_epuise', () => {
+    arreterAnimationRecherche()
+    enAttenteAssignation.value = false
+    aucuneCoursiereDisponible.value = true
+  })
+
+  socket.on('position_maj', ({ lat, lng }) => {
+    majPositionCoursiereCarte(lat, lng)
+  })
+}
+
 async function publierDemande() {
   try {
     const res = await api.post('/courses', {
@@ -726,55 +777,60 @@ async function publierDemande() {
 
     socket.connect()
     socket.emit('rejoindre_course', courseId.value)
-    socket.off('nouveau_message')
-    socket.off('course_assignee')
-    socket.off('livraison_maj')
-    socket.off('statut_change')
-    socket.off('dispatching_epuise')
-    socket.off('position_maj')
-
-    socket.on('course_assignee', ({ course }) => {
-      arreterAnimationRecherche()
-      coursiereChos.value = mapCoursiereUser(course.coursiere)
-      enAttenteAssignation.value = false
-      etape.value = 3
-      toast.success(`${coursiereChos.value.nom} a accepté votre commande !`)
-      envoyerListe()
-      nextTick(() => initCarte())
-    })
-
-    socket.on('nouveau_message', (msg) => {
-      messages.value.push(formaterMessage(msg))
-      scrollBottom()
-    })
-
-    socket.on('livraison_maj', ({ course }) => {
-      livraisonData.value = course.livraison
-      if (course.livraison.statut === 'proposee') toast.info('🛵 Un livreur vous a été proposé !')
-      if (course.livraison.statut === 'acceptee') toast.success('Livraison acceptée, en attente de confirmation de la coursière.')
-      if (course.livraison.statut === 'commandee') toast.success('Livreur commandé !')
-    })
-
-    socket.on('statut_change', ({ course }) => {
-      courseStatut.value = course.statut
-      if (course.statut === 'livree') toast.success('Votre commande a été livrée ! 🎉')
-    })
-
-    socket.on('dispatching_epuise', () => {
-      arreterAnimationRecherche()
-      enAttenteAssignation.value = false
-      aucuneCoursiereDisponible.value = true
-    })
-
-    socket.on('position_maj', ({ lat, lng }) => {
-      majPositionCoursiereCarte(lat, lng)
-    })
+    attacherListenersCommande()
 
     etape.value = 2
     toast.success('Demande publiée ! En attente qu\'une coursière l\'accepte...')
   } catch (err) {
     toast.error('Erreur lors de la création de la course')
     console.error(err)
+  }
+}
+
+async function restaurerCommandeEnCours() {
+  const active = historiqueCommandes.value.find(c =>
+    ['en_attente', 'assignee', 'en_cours'].includes(c.statut) ||
+    (c.statut === 'livree' && c.noteClient === null)
+  )
+  if (!active) return
+
+  courseId.value = active._id
+  marcheChoisi.value = active.marche
+  communeSelectionnee.value = active.commune
+  courseStatut.value = active.statut
+  livraisonData.value = active.livraison
+  budgetCourses.value = active.budgetCourses || null
+  fraisPrestation.value = active.fraisPrestation || null
+  budgetValide.value = !!active.budgetCourses
+  detruireCarte()
+
+  socket.connect()
+  socket.emit('rejoindre_course', active._id)
+  attacherListenersCommande()
+
+  try {
+    const histRes = await api.get(`/courses/${active._id}/messages`)
+    messages.value = histRes.data.messages.map(formaterMessage)
+  } catch (err) {
+    console.error('Erreur messages:', err)
+  }
+
+  if (active.statut === 'en_attente') {
+    enAttenteAssignation.value = true
+    aucuneCoursiereDisponible.value = false
+    demarrerAnimationRecherche()
+    return
+  }
+
+  coursiereChos.value = mapCoursiereUser(active.coursiere)
+  enAttenteAssignation.value = false
+
+  if (active.statut === 'livree' || active.paiementEffectue) {
+    etape.value = 5
+    nextTick(() => initCarte())
+  } else {
+    etape.value = 3
+    nextTick(() => initCarte())
   }
 }
 
@@ -841,6 +897,16 @@ async function refuserLivraison() {
     toast.info('Votre coursière va chercher un autre livreur.')
   } catch (err) {
     toast.error('Erreur')
+  }
+}
+
+async function confirmerReception() {
+  try {
+    await api.put(`/courses/${courseId.value}/confirmer-reception`)
+    courseStatut.value = 'livree'
+    toast.success('Merci ! Réception confirmée 🎉')
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Erreur lors de la confirmation')
   }
 }
 
@@ -1194,6 +1260,16 @@ function nouvelleCommande() {
 .confirm-step { padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; }
 .confirm-step.done { background: var(--vert-light); color: var(--vert-dark); }
 .confirm-step.pending { background: var(--fond); color: var(--texte-sec); border: 0.5px solid var(--bordure); }
+.btn-confirmer-reception {
+  max-width: 320px; width: 100%; margin: 0 auto; display: block;
+  padding: 14px 20px; font-size: 15px;
+  animation: pulseGlowVert 2.6s ease-in-out infinite;
+}
+.confirm-hint { font-size: 12px !important; color: var(--texte-sec) !important; margin: 10px 0 0 !important; max-width: 320px !important; }
+@keyframes pulseGlowVert {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(29,158,117,0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(29,158,117,0); }
+}
 
 /* LIVRAISON YANGO */
 .livraison-recu-wrap { max-width: 480px; margin: 0 auto; }

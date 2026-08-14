@@ -74,7 +74,7 @@ const CourseSchema = new mongoose.Schema({
   livraison: {
     statut: {
       type: String,
-      enum: ['non_demandee', 'proposee', 'acceptee', 'commandee'],
+      enum: ['non_demandee', 'proposee', 'acceptee', 'commandee', 'livree'],
       default: 'non_demandee'
     },
     livreurNom: { type: String, default: '' },
@@ -83,7 +83,8 @@ const CourseSchema = new mongoose.Schema({
     dureeRecuperation: { type: String, default: '' },
     dureeLivraison: { type: String, default: '' },
     prix: { type: Number, default: 0 },
-    proposeeLe: { type: Date, default: null }
+    proposeeLe: { type: Date, default: null },
+    receptionConfirmeeLe: { type: Date, default: null }
   }
 }, { timestamps: true })
 

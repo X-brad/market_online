@@ -7,6 +7,7 @@ const {
   accepterCourse,
   refuserCourse,
   mettreAJourStatut,
+  confirmerReception,
   validerBudget,
   gererLivraison,
   noterCoursiere,
@@ -23,6 +24,7 @@ router.get('/:id/messages', proteger, messagesDeCourse)
 router.put('/:id/accepter', proteger, autoriser('coursiere'), accepterCourse)
 router.put('/:id/refuser', proteger, autoriser('coursiere'), refuserCourse)
 router.put('/:id/statut', proteger, mettreAJourStatut)
+router.put('/:id/confirmer-reception', proteger, autoriser('client'), confirmerReception)
 router.put('/:id/budget', proteger, autoriser('client'), validerBudget)
 router.put('/:id/livraison', proteger, gererLivraison)
 router.put('/:id/noter', proteger, autoriser('client'), noterCoursiere)

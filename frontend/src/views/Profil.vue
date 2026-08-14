@@ -125,15 +125,19 @@
           <div class="coursiere-profil-info">
             <div class="info-item">
               <span>Type de profil</span>
-              <span class="type-badge standard">Standard</span>
+              <span class="type-badge" :class="authStore.user?.coursiere?.typeProfile === 'premium' ? 'premium' : 'standard'">
+                {{ authStore.user?.coursiere?.typeProfile === 'premium' ? 'Premium' : 'Standard' }}
+              </span>
             </div>
             <div class="info-item">
               <span>Statut validation</span>
-              <span class="valid-badge pending">En attente</span>
+              <span class="valid-badge" :class="authStore.user?.coursiere?.valide ? 'validee' : 'pending'">
+                {{ authStore.user?.coursiere?.valide ? '✓ Validée' : 'En attente' }}
+              </span>
             </div>
             <div class="info-item">
-              <span>Marchés couverts</span>
-              <strong>—</strong>
+              <span>Commune</span>
+              <strong>{{ authStore.user?.commune || '—' }}</strong>
             </div>
           </div>
         </div>
@@ -195,10 +199,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
+import api from '../api/axios.js'
 
 const authStore = useAuthStore()
 const toast = useToastStore()
@@ -240,12 +245,45 @@ const statsClient = [
   { icon: '💰', val: '0 F', label: 'Total dépensé' }
 ]
 
-const statsCoursiere = [
+const statsCoursiere = ref([
   { icon: '📦', val: '0', label: 'Courses' },
   { icon: '💰', val: '0 F', label: 'Revenus' },
   { icon: '⭐', val: '—', label: 'Note moyenne' },
   { icon: '✅', val: '0', label: 'Taux succès' }
-]
+])
+
+async function chargerStatsCoursiere() {
+  try {
+    const res = await api.get('/courses/mes-courses')
+    const courses = res.data.courses
+    const livrees = courses.filter(c => c.statut === 'livree')
+    const revenus = livrees.reduce((acc, c) => acc + (c.fraisPrestation || 0), 0)
+    const c = authStore.user?.coursiere
+    const note = c?.nombreAvis > 0 ? Math.round(c.note / c.nombreAvis * 10) / 10 : '—'
+    const taux = courses.length > 0 ? Math.round((livrees.length / courses.length) * 100) : 0
+
+    statsCoursiere.value = [
+      { icon: '📦', val: String(livrees.length), label: 'Courses' },
+      { icon: '💰', val: `${revenus} F`, label: 'Revenus' },
+      { icon: '⭐', val: String(note), label: 'Note moyenne' },
+      { icon: '✅', val: `${taux}%`, label: 'Taux succès' }
+    ]
+
+    historique.value = courses.slice(0, 10).map(cc => ({
+      id: cc._id,
+      marche: cc.marche,
+      date: new Date(cc.createdAt).toLocaleDateString('fr-FR'),
+      montant: cc.fraisPrestation || 0,
+      statut: cc.statut === 'livree' ? 'complete' : 'encours'
+    }))
+  } catch (err) {
+    console.error('Erreur stats coursière:', err)
+  }
+}
+
+onMounted(() => {
+  if (authStore.estCoursiere) chargerStatsCoursiere()
+})
 
 const historique = ref([])
 
@@ -418,8 +456,10 @@ function supprimerCompte() {
 .coursiere-profil-info { display: flex; flex-direction: column; gap: 0; margin-top: 12px; padding-top: 12px; border-top: 0.5px solid var(--bordure); }
 .type-badge { padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 .type-badge.standard { background: var(--vert-light); color: var(--vert-dark); }
+.type-badge.premium { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; }
 .valid-badge { padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 .valid-badge.pending { background: #fef3c7; color: #92400e; }
+.valid-badge.validee { background: #dcfce7; color: #166534; }
 
 /* HISTORIQUE */
 .empty-histo { text-align: center; padding: 32px 20px; }

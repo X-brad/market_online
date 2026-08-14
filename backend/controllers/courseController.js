@@ -42,7 +42,7 @@ exports.mesCourses = async (req, res) => {
 
     const courses = await Course.find(filtre)
       .populate('client', 'nom prenom telephone')
-      .populate('coursiere', 'nom prenom telephone')
+      .populate('coursiere', 'nom prenom telephone coursiere')
       .sort({ createdAt: -1 })
 
     res.json({ succes: true, courses })
@@ -147,6 +147,12 @@ exports.mettreAJourStatut = async (req, res) => {
       return res.status(403).json({ succes: false, message: 'Accès refusé' })
     }
 
+    // Seul le client peut confirmer la réception du colis (via /confirmer-reception),
+    // pas cet endpoint générique — empêche la coursière de se déclarer livrée elle-même
+    if (statut === 'livree' && req.user.role !== 'admin') {
+      return res.status(403).json({ succes: false, message: 'Seul le client peut confirmer la réception du colis' })
+    }
+
     course.statut = statut
     await course.save()
 
@@ -155,6 +161,36 @@ exports.mettreAJourStatut = async (req, res) => {
     res.json({ succes: true, course })
   } catch (err) {
     res.status(500).json({ succes: false, message: err.message })
+  }
+}
+
+// PUT /api/courses/:id/confirmer-reception — Client confirme avoir reçu son colis
+exports.confirmerReception = async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id)
+    if (!course) return res.status(404).json({ succes: false, message: 'Course introuvable' })
+
+    if (course.client.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ succes: false, message: 'Accès refusé' })
+    }
+    if (course.livraison.statut !== 'commandee') {
+      return res.status(400).json({ succes: false, message: 'Le livreur doit d\'abord être réservé avant de confirmer la réception' })
+    }
+
+    course.livraison.statut = 'livree'
+    course.livraison.receptionConfirmeeLe = new Date()
+    course.statut = 'livree'
+    await course.save()
+
+    await course.populate('coursiere', 'nom prenom telephone')
+    await course.populate('client', 'nom prenom telephone')
+
+    getIO()?.to(course._id.toString()).emit('livraison_maj', { course })
+    getIO()?.to(course._id.toString()).emit('statut_change', { course })
+
+    res.json({ succes: true, course })
+  } catch (err) {
+    res.status(400).json({ succes: false, message: err.message })
   }
 }
 
