@@ -9,20 +9,24 @@
         <div class="form-row">
           <div class="form-group">
             <label>Nom</label>
-            <input v-model="form.nom" type="text" placeholder="Konan" required />
+            <input v-model="form.nom" type="text" placeholder="Konan" maxlength="50" required />
           </div>
           <div class="form-group">
             <label>Prénom</label>
-            <input v-model="form.prenom" type="text" placeholder="Amara" required />
+            <input v-model="form.prenom" type="text" placeholder="Amara" maxlength="50" required />
           </div>
         </div>
         <div class="form-group">
           <label>Pseudo</label>
-          <input v-model="form.pseudo" type="text" placeholder="ex: amara_cocody" />
+          <input v-model="form.pseudo" type="text" placeholder="ex: amara_cocody" maxlength="30" />
+        </div>
+        <div class="form-group">
+          <label>Email <span class="optionnel">(optionnel)</span></label>
+          <input v-model="form.email" type="email" placeholder="amara@exemple.com" maxlength="254" />
         </div>
         <div class="form-group">
           <label>Numéro de téléphone</label>
-          <input v-model="form.telephone" type="tel" placeholder="0701020304" required />
+          <input v-model="form.telephone" type="tel" placeholder="0701020304" maxlength="10" required />
         </div>
         <div class="form-group">
           <label>Commune</label>
@@ -40,7 +44,7 @@
         </div>
         <div class="form-group">
           <label>Mot de passe</label>
-          <input v-model="form.motDePasse" type="password" placeholder="••••••••" required />
+          <input v-model="form.motDePasse" type="password" placeholder="••••••••" maxlength="72" required />
         </div>
         <button type="submit" class="btn-primary w-full" :disabled="chargement">
           {{ chargement ? 'Inscription...' : "S'inscrire" }}
@@ -66,18 +70,45 @@ const authStore = useAuthStore()
 const toast = useToastStore()
 
 const communes = ['Cocody', 'Adjamé', 'Treichville', 'Koumassi', 'Bingerville', 'Plateau', 'Marcory', 'Yopougon', 'Abobo']
-const form = ref({ nom: '', prenom: '', pseudo: '', telephone: '', commune: '', role: 'client', motDePasse: '' })
+const form = ref({ nom: '', prenom: '', pseudo: '', email: '', telephone: '', commune: '', role: 'client', motDePasse: '' })
 const erreur = ref('')
 const chargement = ref(false)
 
+const REGEX_TELEPHONE = /^0[0-9]{9}$/
+const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const REGEX_PSEUDO = /^[a-zA-Z0-9_]+$/
+
+function validerFormulaire() {
+  if (!REGEX_TELEPHONE.test(form.value.telephone)) {
+    return 'Le numéro de téléphone doit contenir 10 chiffres et commencer par 0'
+  }
+  if (form.value.pseudo && (form.value.pseudo.length < 3 || !REGEX_PSEUDO.test(form.value.pseudo))) {
+    return 'Le pseudo doit contenir au moins 3 caractères (lettres, chiffres, underscores)'
+  }
+  if (form.value.email && !REGEX_EMAIL.test(form.value.email)) {
+    return 'Adresse email invalide'
+  }
+  if (form.value.motDePasse.length < 6) {
+    return 'Le mot de passe doit contenir au moins 6 caractères'
+  }
+  return null
+}
+
 async function sInscrire() {
   erreur.value = ''
+  const messageValidation = validerFormulaire()
+  if (messageValidation) {
+    erreur.value = messageValidation
+    toast.error(messageValidation)
+    return
+  }
   chargement.value = true
   try {
     const res = await api.post('/auth/inscription', {
       nom: form.value.nom,
       prenom: form.value.prenom,
       pseudo: form.value.pseudo,
+      email: form.value.email,
       telephone: form.value.telephone,
       commune: form.value.commune,
       role: form.value.role,
@@ -152,6 +183,7 @@ h1 { font-size: 26px; font-weight: 700; margin-bottom: 6px; color: var(--texte);
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-group { text-align: left; margin-bottom: 16px; }
 .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--texte); }
+.optionnel { font-weight: 400; color: var(--texte-sec); }
 .form-group input,
 .form-group select {
   width: 100%;

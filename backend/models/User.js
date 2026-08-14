@@ -2,12 +2,36 @@ const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs')
 
 const UserSchema = new mongoose.Schema({
-  nom: { type: String, required: true, trim: true },
-  prenom: { type: String, required: true, trim: true },
-  telephone: { type: String, required: true, unique: true, trim: true },
-  pseudo: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
-  email: { type: String, unique: true, sparse: true, lowercase: true },
-  motDePasse: { type: String, required: true, minlength: 6, select: false },
+  nom: { type: String, required: true, trim: true, maxlength: 50 },
+  prenom: { type: String, required: true, trim: true, maxlength: 50 },
+  telephone: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    match: [/^0[0-9]{9}$/, 'Le numéro de téléphone doit contenir 10 chiffres et commencer par 0']
+  },
+  pseudo: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    lowercase: true,
+    minlength: 3,
+    maxlength: 30,
+    match: [/^[a-z0-9_]+$/, 'Le pseudo ne peut contenir que des lettres, chiffres et underscores']
+  },
+  email: {
+    type: String,
+    unique: true,
+    sparse: true,
+    lowercase: true,
+    trim: true,
+    maxlength: 254,
+    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Adresse email invalide']
+  },
+  // maxlength 72 : bcrypt tronque silencieusement au-delà de 72 octets
+  motDePasse: { type: String, required: true, minlength: 6, maxlength: 72, select: false },
   role: { type: String, enum: ['client', 'coursiere', 'admin'], default: 'client' },
   commune: { type: String, required: true },
   photoUrl: { type: String, default: null },

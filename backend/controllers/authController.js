@@ -9,10 +9,11 @@ exports.inscription = async (req, res) => {
 
     const conditions = [{ telephone }]
     if (pseudo) conditions.push({ pseudo: pseudo.toLowerCase() })
+    if (email) conditions.push({ email: email.toLowerCase() })
 
     const existeDeja = await User.findOne({ $or: conditions })
     if (existeDeja) {
-      return res.status(400).json({ succes: false, message: 'Ce numéro ou pseudo est déjà utilisé' })
+      return res.status(400).json({ succes: false, message: 'Ce numéro, pseudo ou email est déjà utilisé' })
     }
 
     const roleAutorise = role === 'coursiere' ? 'coursiere' : 'client'
@@ -33,12 +34,22 @@ exports.inscription = async (req, res) => {
         prenom: user.prenom,
         pseudo: user.pseudo,
         telephone: user.telephone,
+        email: user.email,
         role: user.role,
         commune: user.commune,
         photoUrl: user.photoUrl
       }
     })
   } catch (err) {
+    if (err.name === 'ValidationError') {
+      const premierMessage = Object.values(err.errors)[0].message
+      return res.status(400).json({ succes: false, message: premierMessage })
+    }
+    if (err.code === 11000) {
+      const champ = Object.keys(err.keyPattern)[0]
+      const libelles = { telephone: 'Ce numéro de téléphone', pseudo: 'Ce pseudo', email: 'Cette adresse email' }
+      return res.status(400).json({ succes: false, message: `${libelles[champ] || 'Ce champ'} est déjà utilisé` })
+    }
     res.status(400).json({ succes: false, message: err.message })
   }
 }
@@ -74,6 +85,7 @@ exports.connexion = async (req, res) => {
         prenom: user.prenom,
         pseudo: user.pseudo,
         telephone: user.telephone,
+        email: user.email,
         role: user.role,
         commune: user.commune,
         photoUrl: user.photoUrl,
