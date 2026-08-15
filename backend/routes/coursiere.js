@@ -3,6 +3,7 @@ const router = express.Router()
 const path = require('path')
 const fs = require('fs')
 const multer = require('multer')
+const sharp = require('sharp')
 const { proteger, autoriser } = require('../middleware/auth')
 const User = require('../models/User')
 const Settings = require('../models/Settings')
@@ -15,14 +16,13 @@ const { getIO } = require('../socket')
 const DOSSIER_PHOTOS = path.join(__dirname, '..', 'uploads', 'profils')
 fs.mkdirSync(DOSSIER_PHOTOS, { recursive: true })
 
+// Résolution minimale exigée à l'upload et taille finale de l'avatar carré
+// (garantit un rendu net et uniforme, sans jamais avoir à agrandir l'image)
+const TAILLE_MIN_PX = 500
+const TAILLE_FINALE_PX = 500
+
 const uploadPhoto = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, DOSSIER_PHOTOS),
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase()
-      cb(null, `${req.user._id}-${Date.now()}${ext}`)
-    }
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)) {
@@ -37,8 +37,26 @@ router.post('/photo', proteger, autoriser('coursiere'), uploadPhoto.single('phot
   try {
     if (!req.file) return res.status(400).json({ succes: false, message: 'Aucune image envoyée' })
 
+    const metadata = await sharp(req.file.buffer).metadata()
+    if (!metadata.width || !metadata.height) {
+      return res.status(400).json({ succes: false, message: 'Image illisible ou corrompue' })
+    }
+    if (metadata.width < TAILLE_MIN_PX || metadata.height < TAILLE_MIN_PX) {
+      return res.status(400).json({
+        succes: false,
+        message: `Image trop petite (${metadata.width}×${metadata.height}px). Minimum requis : ${TAILLE_MIN_PX}×${TAILLE_MIN_PX}px.`
+      })
+    }
+
+    const nomFichier = `${req.user._id}-${Date.now()}.jpg`
+    const cheminFinal = path.join(DOSSIER_PHOTOS, nomFichier)
+    await sharp(req.file.buffer)
+      .resize(TAILLE_FINALE_PX, TAILLE_FINALE_PX, { fit: 'cover', position: 'attention' })
+      .jpeg({ quality: 85 })
+      .toFile(cheminFinal)
+
     const ancienUser = await User.findById(req.user._id).select('photoUrl')
-    const photoUrl = `/uploads/profils/${req.file.filename}`
+    const photoUrl = `/uploads/profils/${nomFichier}`
     await User.findByIdAndUpdate(req.user._id, { photoUrl })
 
     if (ancienUser?.photoUrl) {

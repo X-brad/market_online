@@ -94,6 +94,7 @@
                 <span v-else>📷 Ajouter une photo</span>
                 <input ref="photoInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden @change="onPhotoChoisie" />
               </div>
+              <p class="ob-photo-hint">Minimum {{ TAILLE_MIN_PHOTO }}×{{ TAILLE_MIN_PHOTO }}px, pour un rendu net.</p>
               <textarea
                 v-model="description"
                 maxlength="500"
@@ -264,9 +265,35 @@ async function activerDisponible() {
   }
 }
 
+const TAILLE_MIN_PHOTO = 500
+
+function dimensionsImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => { URL.revokeObjectURL(url); resolve({ largeur: img.naturalWidth, hauteur: img.naturalHeight }) }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible')) }
+    img.src = url
+  })
+}
+
 async function onPhotoChoisie(e) {
   const file = e.target.files[0]
   if (!file) return
+
+  try {
+    const { largeur, hauteur } = await dimensionsImage(file)
+    if (largeur < TAILLE_MIN_PHOTO || hauteur < TAILLE_MIN_PHOTO) {
+      toast.error(`Image trop petite (${largeur}×${hauteur}px). Minimum requis : ${TAILLE_MIN_PHOTO}×${TAILLE_MIN_PHOTO}px.`)
+      e.target.value = ''
+      return
+    }
+  } catch {
+    toast.error('Impossible de lire cette image')
+    e.target.value = ''
+    return
+  }
+
   chargementAction.value = true
   const formData = new FormData()
   formData.append('photo', file)
@@ -532,6 +559,7 @@ onUnmounted(() => {
 }
 .ob-profil-photo:hover { border-color: var(--vert); }
 .ob-profil-photo img { width: 100%; height: 100%; object-fit: cover; }
+.ob-photo-hint { font-size: 12px; color: var(--texte-sec); margin: 0 0 14px; }
 .ob-textarea {
   width: 100%;
   min-height: 80px;

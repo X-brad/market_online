@@ -384,9 +384,35 @@ function declencherChoixPhoto() {
   photoInput.value?.click()
 }
 
+const TAILLE_MIN_PHOTO = 500
+
+function dimensionsImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => { URL.revokeObjectURL(url); resolve({ largeur: img.naturalWidth, hauteur: img.naturalHeight }) }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible')) }
+    img.src = url
+  })
+}
+
 async function onPhotoChoisie(e) {
   const file = e.target.files[0]
   if (!file) return
+
+  try {
+    const { largeur, hauteur } = await dimensionsImage(file)
+    if (largeur < TAILLE_MIN_PHOTO || hauteur < TAILLE_MIN_PHOTO) {
+      toast.error(`Image trop petite (${largeur}×${hauteur}px). Minimum requis : ${TAILLE_MIN_PHOTO}×${TAILLE_MIN_PHOTO}px.`)
+      e.target.value = ''
+      return
+    }
+  } catch {
+    toast.error('Impossible de lire cette image')
+    e.target.value = ''
+    return
+  }
+
   uploadingPhoto.value = true
   const formData = new FormData()
   formData.append('photo', file)
