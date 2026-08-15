@@ -16,9 +16,7 @@ const { getIO } = require('../socket')
 const DOSSIER_PHOTOS = path.join(__dirname, '..', 'uploads', 'profils')
 fs.mkdirSync(DOSSIER_PHOTOS, { recursive: true })
 
-// Résolution minimale exigée à l'upload et taille finale de l'avatar carré
-// (garantit un rendu net et uniforme, sans jamais avoir à agrandir l'image)
-const TAILLE_MIN_PX = 500
+// Taille finale de l'avatar carré ; les images plus petites sont agrandies pour l'atteindre
 const TAILLE_FINALE_PX = 500
 
 const uploadPhoto = multer({
@@ -41,13 +39,9 @@ router.post('/photo', proteger, autoriser('coursiere'), uploadPhoto.single('phot
     if (!metadata.width || !metadata.height) {
       return res.status(400).json({ succes: false, message: 'Image illisible ou corrompue' })
     }
-    if (metadata.width < TAILLE_MIN_PX || metadata.height < TAILLE_MIN_PX) {
-      return res.status(400).json({
-        succes: false,
-        message: `Image trop petite (${metadata.width}×${metadata.height}px). Minimum requis : ${TAILLE_MIN_PX}×${TAILLE_MIN_PX}px.`
-      })
-    }
 
+    // Les images plus petites que TAILLE_FINALE_PX sont agrandies (upscale) pour
+    // toujours obtenir un carré uniforme, plutôt que de rejeter l'envoi
     const nomFichier = `${req.user._id}-${Date.now()}.jpg`
     const cheminFinal = path.join(DOSSIER_PHOTOS, nomFichier)
     await sharp(req.file.buffer)

@@ -92,9 +92,8 @@
               <div class="ob-profil-photo" @click="photoInput?.click()">
                 <img v-if="authStore.user?.photoUrl" :src="apiOrigin + authStore.user.photoUrl" />
                 <span v-else>📷 Ajouter une photo</span>
-                <input ref="photoInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden @change="onPhotoChoisie" />
               </div>
-              <p class="ob-photo-hint">Minimum {{ TAILLE_MIN_PHOTO }}×{{ TAILLE_MIN_PHOTO }}px, pour un rendu net.</p>
+              <p class="ob-photo-hint">Votre photo sera automatiquement recadrée en carré.</p>
               <textarea
                 v-model="description"
                 maxlength="500"
@@ -108,6 +107,8 @@
           </div>
         </div>
       </div>
+
+      <input ref="photoInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden @change="onPhotoChoisie" />
 
       <!-- TERMINÉ -->
       <div class="ob-termine" v-if="etapesRequisesFaites">
@@ -265,34 +266,9 @@ async function activerDisponible() {
   }
 }
 
-const TAILLE_MIN_PHOTO = 500
-
-function dimensionsImage(file) {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => { URL.revokeObjectURL(url); resolve({ largeur: img.naturalWidth, hauteur: img.naturalHeight }) }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible')) }
-    img.src = url
-  })
-}
-
 async function onPhotoChoisie(e) {
   const file = e.target.files[0]
   if (!file) return
-
-  try {
-    const { largeur, hauteur } = await dimensionsImage(file)
-    if (largeur < TAILLE_MIN_PHOTO || hauteur < TAILLE_MIN_PHOTO) {
-      toast.error(`Image trop petite (${largeur}×${hauteur}px). Minimum requis : ${TAILLE_MIN_PHOTO}×${TAILLE_MIN_PHOTO}px.`)
-      e.target.value = ''
-      return
-    }
-  } catch {
-    toast.error('Impossible de lire cette image')
-    e.target.value = ''
-    return
-  }
 
   chargementAction.value = true
   const formData = new FormData()
