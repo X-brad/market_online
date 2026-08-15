@@ -104,7 +104,9 @@
                 <th>Statut</th>
                 <th>Note</th>
                 <th>Courses</th>
+                <th>Litiges</th>
                 <th>Validation</th>
+                <th>Compte</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -131,20 +133,83 @@
                 <td>⭐ {{ c.note }}</td>
                 <td>{{ c.courses }}</td>
                 <td>
+                  <span class="litige-count-badge" :class="{ actif: c.nombreLitiges > 0 }">{{ c.nombreLitiges }}</span>
+                </td>
+                <td>
                   <span class="valid-badge" :class="c.valide ? 'validee' : 'pending'">
                     {{ c.valide ? '✓ Validée' : '⏳ En attente' }}
                   </span>
                 </td>
                 <td>
+                  <span class="compte-badge" :class="c.actif ? 'actif' : 'suspendu'" :title="c.motifSuspension || ''">
+                    {{ c.actif ? '✓ Actif' : '🚫 Suspendu' }}
+                  </span>
+                </td>
+                <td>
                   <div class="action-btns">
                     <button class="btn-sm green" @click="validerCoursiere(c)" v-if="!c.valide">✓</button>
-                    <button class="btn-sm red" @click="suspendreCoursiere(c)">🚫</button>
+                    <button class="btn-sm red" @click="ouvrirSuspension('coursiere', c)" v-if="c.actif">🚫</button>
+                    <button class="btn-sm amber" @click="reactiver('coursiere', c)" v-else>↩</button>
                     <button class="btn-sm gray" @click="voirCoursiere(c)">👁</button>
                   </div>
                 </td>
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- CLIENTS -->
+      <div v-if="activeMenu === 'clients'" class="content">
+        <div class="toolbar">
+          <input v-model="searchClient" placeholder="🔍 Rechercher un client..." class="search-input" />
+        </div>
+        <div class="table-card card">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Commune</th>
+                <th>Courses</th>
+                <th>Litiges</th>
+                <th>Compte</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in clientsFiltres" :key="c.id">
+                <td>
+                  <div class="user-cell">
+                    <div class="mini-avatar">{{ c.initiales }}</div>
+                    <div>
+                      <p>{{ c.nom }}</p>
+                      <span>{{ c.telephone }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td>📍 {{ c.commune }}</td>
+                <td>{{ c.courses }}</td>
+                <td>
+                  <span class="litige-count-badge" :class="{ actif: c.nombreLitiges > 0 }">{{ c.nombreLitiges }}</span>
+                </td>
+                <td>
+                  <span class="compte-badge" :class="c.actif ? 'actif' : 'suspendu'" :title="c.motifSuspension || ''">
+                    {{ c.actif ? '✓ Actif' : '🚫 Suspendu' }}
+                  </span>
+                </td>
+                <td>
+                  <div class="action-btns">
+                    <button class="btn-sm red" @click="ouvrirSuspension('client', c)" v-if="c.actif">🚫</button>
+                    <button class="btn-sm amber" @click="reactiver('client', c)" v-else>↩</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="empty-state" v-if="clientsFiltres.length === 0">
+            <span>👤</span>
+            <p>Aucun client trouvé</p>
+          </div>
         </div>
       </div>
 
@@ -326,6 +391,20 @@
 
     </div>
 
+    <!-- MODALE SUSPENSION -->
+    <div class="modal-overlay" v-if="suspensionCible" @click.self="suspensionCible = null">
+      <div class="modal">
+        <button class="modal-close" @click="suspensionCible = null">✕</button>
+        <div class="modal-icon">🚫</div>
+        <h3>Suspendre {{ suspensionCible.nom }}</h3>
+        <p>Le compte sera immédiatement bloqué. Précisez le motif (visible par l'utilisateur à la connexion).</p>
+        <textarea v-model="motifSaisi" class="motif-textarea" maxlength="300" placeholder="Ex : comportement signalé par plusieurs clients, litiges répétés..."></textarea>
+        <button class="btn-confirmer-suspension" :disabled="!motifSaisi.trim()" @click="confirmerSuspension">
+          Confirmer la suspension
+        </button>
+      </div>
+    </div>
+
     <!-- TOAST -->
     <div class="toast" v-if="toastMsg" :class="toastType">{{ toastMsg }}</div>
 
@@ -354,6 +433,7 @@ const dateAujourdhui = computed(() => {
 const menus = [
   { id: 'overview', icon: '📊', label: 'Vue d\'ensemble', desc: 'Statistiques globales de la plateforme' },
   { id: 'coursieres', icon: '👩🏾', label: 'Coursières', desc: 'Gestion et validation des coursières' },
+  { id: 'clients', icon: '👤', label: 'Clients', desc: 'Gestion des comptes clients' },
   { id: 'tarifs', icon: '💰', label: 'Tarification', desc: 'Unités journalières et quotas' },
   { id: 'transactions', icon: '💳', label: 'Transactions', desc: 'Suivi des paiements et revenus' },
   { id: 'litiges', icon: '⚠️', label: 'Litiges', desc: 'Gestion des conflits et signalements' },
@@ -368,6 +448,10 @@ const transactions = ref([])
 const statsTransactions = ref({ revenus: 0, total: 0 })
 const marchesAdmin = ref([])
 const coursieres = ref([])
+const clients = ref([])
+const searchClient = ref('')
+const suspensionCible = ref(null)
+const motifSaisi = ref('')
 const parametres = ref({
   unitePrixStandardVendeuse: 500,
   unitePrixStandardNonVendeuse: 600,
@@ -416,6 +500,10 @@ const coursieresFiltrees = computed(() => {
   })
 })
 
+const clientsFiltres = computed(() => {
+  return clients.value.filter(c => c.nom.toLowerCase().includes(searchClient.value.toLowerCase()))
+})
+
 const tarifs = [
   { label: 'Standard — Vendeuse', key: 'unitePrixStandardVendeuse' },
   { label: 'Standard — Non-vendeuse', key: 'unitePrixStandardNonVendeuse' },
@@ -449,6 +537,15 @@ async function chargerCoursieres() {
     coursieres.value = res.data.coursieres
   } catch (err) {
     console.error('Erreur coursières:', err)
+  }
+}
+
+async function chargerClients() {
+  try {
+    const res = await api.get('/admin/clients')
+    clients.value = res.data.clients
+  } catch (err) {
+    console.error('Erreur clients:', err)
   }
 }
 
@@ -495,6 +592,7 @@ async function chargerParametres() {
 onMounted(() => {
   chargerStats()
   chargerCoursieres()
+  chargerClients()
   chargerTransactions()
   chargerLitiges()
   chargerMarches()
@@ -511,14 +609,33 @@ async function validerCoursiere(c) {
   }
 }
 
-async function suspendreCoursiere(c) {
+function ouvrirSuspension(type, c) {
+  suspensionCible.value = { type, id: c.id, nom: c.nom, ref: c }
+  motifSaisi.value = ''
+}
+
+async function confirmerSuspension() {
+  const { type, id, ref } = suspensionCible.value
   try {
-    await api.put(`/admin/coursieres/${c.id}/suspendre`)
-    c.statut = 'hors_ligne'
-    c.actif = false
-    showToast(`🚫 ${c.nom} suspendue`, 'warning')
+    await api.put(`/admin/${type === 'coursiere' ? 'coursieres' : 'clients'}/${id}/suspendre`, { motif: motifSaisi.value.trim() })
+    ref.actif = false
+    ref.motifSuspension = motifSaisi.value.trim()
+    if (type === 'coursiere') ref.statut = 'hors_ligne'
+    showToast(`🚫 ${ref.nom} suspendu(e)`, 'warning')
+    suspensionCible.value = null
   } catch (err) {
-    showToast('Erreur lors de la suspension', 'warning')
+    showToast(err.response?.data?.message || 'Erreur lors de la suspension', 'warning')
+  }
+}
+
+async function reactiver(type, c) {
+  try {
+    await api.put(`/admin/${type === 'coursiere' ? 'coursieres' : 'clients'}/${c.id}/reactiver`)
+    c.actif = true
+    c.motifSuspension = null
+    showToast(`↩ ${c.nom} réactivé(e)`)
+  } catch (err) {
+    showToast('Erreur lors de la réactivation', 'warning')
   }
 }
 
@@ -652,7 +769,13 @@ async function toggleMarche(m) {
 .btn-sm { width: 28px; height: 28px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; transition: all 0.2s; }
 .btn-sm.green { background: #dcfce7; }
 .btn-sm.red { background: #fee2e2; }
+.btn-sm.amber { background: #fef3c7; }
 .btn-sm.gray { background: var(--fond); }
+.compte-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: default; }
+.compte-badge.actif { background: #dcfce7; color: #166534; }
+.compte-badge.suspendu { background: #fee2e2; color: #dc2626; }
+.litige-count-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 20px; font-size: 12px; font-weight: 700; background: var(--fond); color: var(--texte-sec); }
+.litige-count-badge.actif { background: #fee2e2; color: #dc2626; }
 
 /* TARIFS */
 .tarif-form { display: flex; flex-direction: column; gap: 16px; }
@@ -710,6 +833,19 @@ async function toggleMarche(m) {
 .empty-state { text-align: center; padding: 60px 20px; }
 .empty-state span { font-size: 48px; display: block; margin-bottom: 12px; }
 .empty-state p { font-size: 16px; color: var(--texte-sec); }
+
+/* MODALE SUSPENSION */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 24px; backdrop-filter: blur(4px); }
+.modal { background: white; border-radius: 20px; padding: 36px; max-width: 420px; width: 100%; text-align: center; position: relative; box-shadow: 0 24px 60px rgba(0,0,0,0.2); }
+.modal-close { position: absolute; top: 16px; right: 16px; background: var(--fond); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 14px; color: var(--texte-sec); }
+.modal-icon { font-size: 44px; margin-bottom: 16px; display: block; }
+.modal h3 { font-size: 20px; font-weight: 800; margin-bottom: 8px; color: var(--texte); }
+.modal p { font-size: 13px; color: var(--texte-sec); margin-bottom: 20px; line-height: 1.5; }
+.motif-textarea { width: 100%; min-height: 90px; padding: 12px 14px; border: 1px solid var(--bordure); border-radius: var(--radius); font-size: 14px; font-family: inherit; resize: vertical; box-sizing: border-box; margin-bottom: 16px; }
+.motif-textarea:focus { border-color: var(--vert); outline: none; }
+.btn-confirmer-suspension { width: 100%; padding: 13px; background: #dc2626; color: white; border: none; border-radius: var(--radius); font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+.btn-confirmer-suspension:hover:not(:disabled) { background: #b91c1c; }
+.btn-confirmer-suspension:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* TOAST */
 .toast { position: fixed; bottom: 24px; right: 24px; padding: 14px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; z-index: 9999; animation: toastIn 0.3s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }

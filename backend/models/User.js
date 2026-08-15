@@ -63,7 +63,8 @@ const UserSchema = new mongoose.Schema({
       misAJourLe: { type: Date, default: null }
     }
   },
-  actif: { type: Boolean, default: true }
+  actif: { type: Boolean, default: true },
+  motifSuspension: { type: String, default: null, trim: true, maxlength: 300 }
 }, { timestamps: true })
 
 UserSchema.pre('save', async function () {

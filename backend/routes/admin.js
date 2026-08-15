@@ -5,6 +5,7 @@ const User = require('../models/User')
 const Course = require('../models/Course')
 const Transaction = require('../models/Transaction')
 const Settings = require('../models/Settings')
+const Litige = require('../models/Litige')
 
 // GET /api/admin/stats — Stats globales
 router.get('/stats', proteger, autoriser('admin'), async (req, res) => {
@@ -42,7 +43,7 @@ router.get('/stats', proteger, autoriser('admin'), async (req, res) => {
 router.get('/coursieres', proteger, autoriser('admin'), async (req, res) => {
   try {
     const coursieres = await User.find({ role: 'coursiere' })
-      .select('nom prenom telephone commune coursiere createdAt actif')
+      .select('nom prenom telephone commune coursiere createdAt actif motifSuspension')
       .sort({ createdAt: -1 })
 
     const debutJour = new Date()
@@ -61,10 +62,37 @@ router.get('/coursieres', proteger, autoriser('admin'), async (req, res) => {
         : 0,
       courses: await Course.countDocuments({ coursiere: c._id, createdAt: { $gte: debutJour } }),
       valide: c.coursiere?.valide || false,
-      actif: c.actif
+      actif: c.actif,
+      motifSuspension: c.motifSuspension,
+      nombreLitiges: await Litige.countDocuments({ coursiere: c._id })
     })))
 
     res.json({ succes: true, coursieres: data })
+  } catch (err) {
+    res.status(500).json({ succes: false, message: err.message })
+  }
+})
+
+// GET /api/admin/clients — Liste tous les clients
+router.get('/clients', proteger, autoriser('admin'), async (req, res) => {
+  try {
+    const clients = await User.find({ role: 'client' })
+      .select('nom prenom telephone commune createdAt actif motifSuspension')
+      .sort({ createdAt: -1 })
+
+    const data = await Promise.all(clients.map(async (c) => ({
+      id: c._id,
+      nom: `${c.prenom} ${c.nom}`,
+      initiales: (c.prenom[0] || '') + (c.nom[0] || ''),
+      telephone: c.telephone,
+      commune: c.commune,
+      courses: await Course.countDocuments({ client: c._id }),
+      actif: c.actif,
+      motifSuspension: c.motifSuspension,
+      nombreLitiges: await Litige.countDocuments({ client: c._id })
+    })))
+
+    res.json({ succes: true, clients: data })
   } catch (err) {
     res.status(500).json({ succes: false, message: err.message })
   }
@@ -99,11 +127,48 @@ router.put('/coursieres/:id/valider', proteger, autoriser('admin'), async (req, 
 // PUT /api/admin/coursieres/:id/suspendre
 router.put('/coursieres/:id/suspendre', proteger, autoriser('admin'), async (req, res) => {
   try {
+    const motif = (req.body.motif || '').trim()
+    if (!motif) return res.status(400).json({ succes: false, message: 'Un motif de suspension est requis' })
+
     await User.findByIdAndUpdate(req.params.id, {
       'coursiere.statut': 'hors_ligne',
-      actif: false
+      actif: false,
+      motifSuspension: motif
     })
     res.json({ succes: true, message: 'Coursière suspendue' })
+  } catch (err) {
+    res.status(500).json({ succes: false, message: err.message })
+  }
+})
+
+// PUT /api/admin/coursieres/:id/reactiver
+router.put('/coursieres/:id/reactiver', proteger, autoriser('admin'), async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.params.id, { actif: true, motifSuspension: null })
+    res.json({ succes: true, message: 'Coursière réactivée' })
+  } catch (err) {
+    res.status(500).json({ succes: false, message: err.message })
+  }
+})
+
+// PUT /api/admin/clients/:id/suspendre
+router.put('/clients/:id/suspendre', proteger, autoriser('admin'), async (req, res) => {
+  try {
+    const motif = (req.body.motif || '').trim()
+    if (!motif) return res.status(400).json({ succes: false, message: 'Un motif de suspension est requis' })
+
+    await User.findByIdAndUpdate(req.params.id, { actif: false, motifSuspension: motif })
+    res.json({ succes: true, message: 'Client suspendu' })
+  } catch (err) {
+    res.status(500).json({ succes: false, message: err.message })
+  }
+})
+
+// PUT /api/admin/clients/:id/reactiver
+router.put('/clients/:id/reactiver', proteger, autoriser('admin'), async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.params.id, { actif: true, motifSuspension: null })
+    res.json({ succes: true, message: 'Client réactivé' })
   } catch (err) {
     res.status(500).json({ succes: false, message: err.message })
   }

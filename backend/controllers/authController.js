@@ -75,6 +75,13 @@ exports.connexion = async (req, res) => {
     const ok = await user.verifierMotDePasse(motDePasse)
     if (!ok) return res.status(401).json({ succes: false, message: 'Identifiants incorrects' })
 
+    if (!user.actif) {
+      return res.status(403).json({
+        succes: false,
+        message: user.motifSuspension ? `Compte suspendu : ${user.motifSuspension}` : 'Compte suspendu. Contactez l\'administrateur.'
+      })
+    }
+
     const token = genererToken(user._id)
 
     res.json({
