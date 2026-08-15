@@ -10,6 +10,11 @@ export const useAuthStore = defineStore('auth', () => {
   const estCoursiere = computed(() => user.value?.role === 'coursiere')
   const estAdmin = computed(() => user.value?.role === 'admin')
 
+  const onboardingComplete = computed(() => {
+    if (!estCoursiere.value) return true
+    return !!user.value?.coursiere?.onboardingComplete
+  })
+
   function connecter(tokenRecu, userRecu) {
     token.value = tokenRecu
     user.value = userRecu
@@ -37,5 +42,5 @@ export const useAuthStore = defineStore('auth', () => {
     return '/'
   }
 
-  return { token, user, estConnecte, estClient, estCoursiere, estAdmin, connecter, deconnecter, mettreAJourUser, getDashboardRoute }
+  return { token, user, estConnecte, estClient, estCoursiere, estAdmin, onboardingComplete, connecter, deconnecter, mettreAJourUser, getDashboardRoute }
 })

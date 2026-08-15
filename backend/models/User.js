@@ -52,6 +52,11 @@ const UserSchema = new mongoose.Schema({
     note: { type: Number, default: 0 },
     nombreAvis: { type: Number, default: 0 },
     valide: { type: Boolean, default: false },
+    description: { type: String, default: '', trim: true, maxlength: 500 },
+    // Drapeau permanent : posé une seule fois quand les 5 étapes d'onboarding sont
+    // franchies. Distinct de l'état courant (statut/unités) qui varie au quotidien,
+    // pour ne pas re-bloquer une coursière déjà onboardée quand elle repasse hors ligne.
+    onboardingComplete: { type: Boolean, default: false },
     position: {
       lat: { type: Number, default: null },
       lng: { type: Number, default: null },

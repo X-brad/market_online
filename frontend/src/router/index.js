@@ -80,6 +80,15 @@ router.beforeEach((to, from, next) => {
     return next('/')
   }
 
+  // Une coursière qui n'a pas terminé son onboarding ne peut pas accéder au dashboard directement
+  if (to.name === 'CouriereDashboard' && authStore.estCoursiere && !authStore.onboardingComplete) {
+    return next('/coursiere/onboarding')
+  }
+  // Une coursière déjà onboardée n'a plus besoin de revoir cette page
+  if (to.name === 'CoursiereOnboarding' && authStore.estCoursiere && authStore.onboardingComplete) {
+    return next('/coursiere/dashboard')
+  }
+
   next()
 })
 

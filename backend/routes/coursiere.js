@@ -158,9 +158,33 @@ router.put('/position', proteger, autoriser('coursiere'), async (req, res) => {
   }
 })
 
+// PUT /api/coursiere/profil — description du profil, dernière étape de l'onboarding
+router.put('/profil', proteger, autoriser('coursiere'), async (req, res) => {
+  try {
+    const { description } = req.body
+    // L'achat d'unités reste possible pendant l'onboarding mais ne le bloque pas :
+    // elle peut payer maintenant ou plus tard depuis son dashboard.
+    const c = req.user.coursiere
+    const onboardingComplete = !!(
+      c?.valide && c?.position?.lat != null && c?.statut === 'disponible' &&
+      req.user.photoUrl && (description || '').trim()
+    )
+    await User.findByIdAndUpdate(req.user._id, {
+      'coursiere.description': (description || '').trim(),
+      'coursiere.onboardingComplete': onboardingComplete
+    })
+    res.json({ succes: true, message: 'Profil mis à jour' })
+  } catch (err) {
+    res.status(400).json({ succes: false, message: err.message })
+  }
+})
+
 // PUT /api/coursiere/unites
 router.put('/unites', proteger, autoriser('coursiere'), async (req, res) => {
   try {
+    if (!req.user.coursiere?.valide) {
+      return res.status(403).json({ succes: false, message: 'Votre compte est en attente de validation par l\'administrateur' })
+    }
     const { type } = req.body
     const settings = await Settings.getSettings()
     const quota = type === 'premium' ? settings.quotaPremium : settings.quotaStandard

@@ -11,6 +11,7 @@
           <div class="ob-progress-bar" :style="{ width: progression + '%' }"></div>
         </div>
         <span class="ob-progress-label">{{ etapesFaites }} / {{ etapes.length }} étapes complétées</span>
+        <p class="ob-unites-reminder" v-if="unitesSautees && !c.unitesActives">💰 N'oubliez pas d'activer vos unités depuis votre dashboard pour recevoir des courses.</p>
       </div>
 
       <!-- ÉTAPES -->
@@ -19,11 +20,12 @@
           v-for="(e, i) in etapes"
           :key="e.id"
           class="ob-etape"
-          :class="{ done: e.faite, active: i === etapeActive }"
+          :class="{ done: e.faite, active: i === etapeActive, sautee: e.id === 2 && unitesSautees && !e.faite }"
         >
           <div class="ob-etape-left">
-            <div class="ob-etape-dot" :class="{ done: e.faite, active: i === etapeActive }">
+            <div class="ob-etape-dot" :class="{ done: e.faite, active: i === etapeActive, sautee: e.id === 2 && unitesSautees && !e.faite }">
               <span v-if="e.faite">✓</span>
+              <span v-else-if="e.id === 2 && unitesSautees">⏭</span>
               <span v-else>{{ i + 1 }}</span>
             </div>
             <div class="ob-etape-line" v-if="i < etapes.length - 1" :class="{ done: e.faite }"></div>
@@ -36,10 +38,70 @@
                 <p>{{ e.desc }}</p>
               </div>
               <span class="ob-done-badge" v-if="e.faite">✓ Fait</span>
+              <span class="ob-done-badge sautee" v-else-if="e.id === 2 && unitesSautees">⏭ Plus tard</span>
             </div>
-            <div class="ob-etape-action" v-if="!e.faite && i === etapeActive">
-              <button class="btn-action" @click="completerEtape(i)">
-                {{ e.btnLabel }}
+
+            <!-- Étape 1 : validation admin, aucune action possible, juste une attente -->
+            <div class="ob-etape-action" v-if="!e.faite && i === etapeActive && e.id === 1">
+              <div class="ob-attente-validation">
+                <span class="ob-spinner"></span>
+                En attente de validation par l'administrateur…
+              </div>
+            </div>
+
+            <!-- Étape 2 : achat d'unités (optionnelle, peut être différée au dashboard) -->
+            <div class="ob-etape-action ob-unites" v-if="!e.faite && i === etapeActive && e.id === 2 && !unitesSautees">
+              <div class="ob-unites-options">
+                <div
+                  class="ob-unite-option"
+                  v-for="u in unitesOptions"
+                  :key="u.type"
+                  :class="{ selected: uniteChoisie === u.type }"
+                  @click="uniteChoisie = u.type"
+                >
+                  <span class="ob-unite-icon">{{ u.icon }}</span>
+                  <p class="ob-unite-type">{{ u.type }}</p>
+                  <p class="ob-unite-prix">{{ u.prix }} F / jour</p>
+                  <p class="ob-unite-quota">{{ u.quota }} courses max</p>
+                </div>
+              </div>
+              <button class="btn-action" @click="acheterUnites" :disabled="chargementAction">
+                🌊 Payer via Wave
+              </button>
+              <button class="btn-plus-tard" @click="unitesSautees = true">
+                Je paierai plus tard, depuis mon dashboard →
+              </button>
+            </div>
+
+            <!-- Étape 3 : géolocalisation -->
+            <div class="ob-etape-action" v-if="!e.faite && i === etapeActive && e.id === 3">
+              <button class="btn-action" @click="activerPosition" :disabled="chargementAction">
+                {{ chargementAction ? 'Localisation...' : '📍 Activer ma position' }}
+              </button>
+            </div>
+
+            <!-- Étape 4 : disponible -->
+            <div class="ob-etape-action" v-if="!e.faite && i === etapeActive && e.id === 4">
+              <button class="btn-action" @click="activerDisponible" :disabled="chargementAction">
+                🟢 Me mettre disponible
+              </button>
+            </div>
+
+            <!-- Étape 5 : profil (photo + description) -->
+            <div class="ob-etape-action ob-profil" v-if="!e.faite && i === etapeActive && e.id === 5">
+              <div class="ob-profil-photo" @click="photoInput?.click()">
+                <img v-if="authStore.user?.photoUrl" :src="apiOrigin + authStore.user.photoUrl" />
+                <span v-else>📷 Ajouter une photo</span>
+                <input ref="photoInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden @change="onPhotoChoisie" />
+              </div>
+              <textarea
+                v-model="description"
+                maxlength="500"
+                placeholder="Présentez-vous en quelques mots : votre secteur, votre expérience..."
+                class="ob-textarea"
+              ></textarea>
+              <button class="btn-action" @click="enregistrerProfil" :disabled="chargementAction || !authStore.user?.photoUrl || !description.trim()">
+                {{ chargementAction ? 'Enregistrement...' : '⭐ Enregistrer mon profil' }}
               </button>
             </div>
           </div>
@@ -47,18 +109,14 @@
       </div>
 
       <!-- TERMINÉ -->
-      <div class="ob-termine" v-if="etapesFaites === etapes.length">
+      <div class="ob-termine" v-if="etapesRequisesFaites">
         <div class="ob-termine-icon">🎉</div>
         <h2>Vous êtes prête !</h2>
-        <p>Votre profil est configuré. Vous pouvez maintenant recevoir des courses sur MamiMarché.</p>
-        <button class="btn-dashboard" @click="allerDashboard">
+        <p v-if="c.unitesActives">Votre profil est configuré. Vous pouvez maintenant recevoir des courses sur MamiMarché.</p>
+        <p v-else>Votre profil est configuré. Activez vos unités depuis votre dashboard dès que vous êtes prête à recevoir des courses.</p>
+        <button class="btn-dashboard" @click="router.push('/coursiere/dashboard')">
           Accéder à mon dashboard →
         </button>
-      </div>
-
-      <!-- SKIP -->
-      <div class="ob-skip" v-if="etapesFaites < etapes.length">
-        <button @click="allerDashboard">Passer cette étape pour l'instant →</button>
       </div>
 
     </div>
@@ -66,82 +124,191 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toast'
+import api from '../../api/axios.js'
 
 const authStore = useAuthStore()
 const toast = useToastStore()
 const router = useRouter()
 
-const etapeActive = computed(() => etapes.value.findIndex(e => !e.faite))
+const apiOrigin = api.defaults.baseURL.replace(/\/api\/?$/, '')
+const chargementAction = ref(false)
+const photoInput = ref(null)
+const description = ref(authStore.user?.coursiere?.description || '')
+const uniteChoisie = ref('Standard')
+const unitesSautees = ref(false)
 
-const etapes = ref([
+const parametresTarifs = ref({ unitePrixStandardVendeuse: 500, unitePrixPremiumVendeuse: 1000, quotaStandard: 10, quotaPremium: 15 })
+const unitesOptions = computed(() => [
+  { type: 'Standard', icon: '⭐', prix: parametresTarifs.value.unitePrixStandardVendeuse, quota: parametresTarifs.value.quotaStandard },
+  { type: 'Premium', icon: '💎', prix: parametresTarifs.value.unitePrixPremiumVendeuse, quota: parametresTarifs.value.quotaPremium }
+])
+
+const c = computed(() => authStore.user?.coursiere || {})
+
+const etapes = computed(() => [
   {
     id: 1,
     icon: '✅',
-    titre: 'Compte créé avec succès',
-    desc: 'Votre compte coursière a été créé. En attente de validation par l\'administrateur.',
-    btnLabel: '',
-    faite: true
+    titre: 'Validation de votre compte',
+    desc: c.value.valide
+      ? 'Votre compte coursière a été validé par l\'administrateur.'
+      : 'Votre compte coursière a été créé. En attente de validation par l\'administrateur.',
+    faite: !!c.value.valide
   },
   {
     id: 2,
     icon: '💰',
     titre: 'Acheter vos unités journalières',
     desc: 'Achetez des unités pour être visible sur la plateforme et recevoir des courses aujourd\'hui.',
-    btnLabel: '💳 Acheter mes unités via Wave',
-    faite: false
+    faite: !!c.value.unitesActives
   },
   {
     id: 3,
     icon: '📍',
-    titre: 'Définir votre marché de prédilection',
-    desc: 'Choisissez le ou les marchés où vous opérez pour recevoir des courses pertinentes.',
-    btnLabel: '🏪 Choisir mon marché',
-    faite: false
+    titre: 'Activer votre géolocalisation',
+    desc: 'Autorisez la position pour que la plateforme calcule votre distance réelle avec les clients.',
+    faite: c.value.position?.lat != null
   },
   {
     id: 4,
     icon: '🟢',
     titre: 'Activer votre statut disponible',
     desc: 'Passez en mode disponible pour apparaître dans les résultats de recherche des clients.',
-    btnLabel: '🟢 Me mettre disponible',
-    faite: false
+    faite: c.value.statut === 'disponible'
   },
   {
     id: 5,
     icon: '⭐',
     titre: 'Compléter votre profil',
     desc: 'Ajoutez une photo et une description pour inspirer confiance aux clients.',
-    btnLabel: '👤 Compléter mon profil',
-    faite: false
+    faite: !!(authStore.user?.photoUrl && c.value.description)
   }
 ])
 
+const etapeActive = computed(() => etapes.value.findIndex(e => !e.faite && !(e.id === 2 && unitesSautees.value)))
 const etapesFaites = computed(() => etapes.value.filter(e => e.faite).length)
 const progression = computed(() => (etapesFaites.value / etapes.value.length) * 100)
+const etapesRequisesFaites = computed(() => etapes.value.every(e => e.faite || (e.id === 2 && unitesSautees.value)))
 
-function completerEtape(i) {
-  etapes.value[i].faite = true
-  const messages = [
-    '',
-    '💰 Unités achetées ! Vous êtes maintenant visible.',
-    '🏪 Marché défini avec succès !',
-    '🟢 Vous êtes maintenant disponible !',
-    '⭐ Profil complété !'
-  ]
-  toast.success(messages[i] || 'Étape complétée !')
-
-  if (etapesFaites.value === etapes.value.length) {
-    setTimeout(() => toast.success('🎉 Félicitations ! Vous êtes prête à recevoir des courses !'), 1000)
+async function rafraichirUser() {
+  try {
+    const res = await api.get('/auth/moi')
+    authStore.mettreAJourUser({ coursiere: res.data.user.coursiere, photoUrl: res.data.user.photoUrl })
+  } catch (err) {
+    console.error('Erreur rafraîchissement profil:', err)
   }
 }
 
-function allerDashboard() {
-  router.push('/coursiere/dashboard')
+async function chargerTarifs() {
+  try {
+    const res = await api.get('/parametres/public')
+    parametresTarifs.value = res.data
+  } catch (err) {
+    console.error('Erreur tarifs:', err)
+  }
 }
+
+async function acheterUnites() {
+  chargementAction.value = true
+  try {
+    await api.put('/coursiere/unites', { type: uniteChoisie.value })
+    await rafraichirUser()
+    toast.success('💰 Unités achetées ! Vous êtes maintenant visible.')
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Erreur lors de l\'achat des unités')
+  } finally {
+    chargementAction.value = false
+  }
+}
+
+function activerPosition() {
+  if (!navigator.geolocation) {
+    toast.error('La géolocalisation n\'est pas disponible sur cet appareil')
+    return
+  }
+  chargementAction.value = true
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      try {
+        await api.put('/coursiere/position', { lat: pos.coords.latitude, lng: pos.coords.longitude })
+        await rafraichirUser()
+        toast.success('📍 Position activée !')
+      } catch (err) {
+        toast.error('Erreur lors de l\'enregistrement de la position')
+      } finally {
+        chargementAction.value = false
+      }
+    },
+    () => {
+      toast.error('Autorisez la géolocalisation dans votre navigateur pour continuer')
+      chargementAction.value = false
+    },
+    { enableHighAccuracy: true }
+  )
+}
+
+async function activerDisponible() {
+  chargementAction.value = true
+  try {
+    await api.put('/coursiere/statut', { statut: 'disponible' })
+    await rafraichirUser()
+    toast.success('🟢 Vous êtes maintenant disponible !')
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Erreur lors du changement de statut')
+  } finally {
+    chargementAction.value = false
+  }
+}
+
+async function onPhotoChoisie(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  chargementAction.value = true
+  const formData = new FormData()
+  formData.append('photo', file)
+  try {
+    const res = await api.post('/coursiere/photo', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+    authStore.mettreAJourUser({ photoUrl: res.data.photoUrl })
+    toast.success('Photo ajoutée 📸')
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Erreur lors de l\'envoi de la photo')
+  } finally {
+    chargementAction.value = false
+    e.target.value = ''
+  }
+}
+
+async function enregistrerProfil() {
+  chargementAction.value = true
+  try {
+    await api.put('/coursiere/profil', { description: description.value.trim() })
+    await rafraichirUser()
+    toast.success('⭐ Profil complété !')
+    setTimeout(() => toast.success('🎉 Félicitations ! Vous êtes prête à recevoir des courses !'), 1000)
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Erreur lors de l\'enregistrement du profil')
+  } finally {
+    chargementAction.value = false
+  }
+}
+
+let intervalleValidation = null
+
+onMounted(() => {
+  chargerTarifs()
+  rafraichirUser()
+  intervalleValidation = setInterval(() => {
+    if (!c.value.valide) rafraichirUser()
+  }, 8000)
+})
+
+onUnmounted(() => {
+  clearInterval(intervalleValidation)
+})
 </script>
 
 <style scoped>
@@ -263,6 +430,9 @@ function allerDashboard() {
   font-weight: 700;
   flex-shrink: 0;
 }
+.ob-done-badge.sautee { background: #fff7e0; color: #92400e; }
+.ob-etape-dot.sautee { background: #fde9b8; color: #92400e; }
+.ob-etape.sautee { opacity: 1; }
 .ob-etape-action { padding-left: 36px; }
 .btn-action {
   padding: 12px 24px;
@@ -275,7 +445,106 @@ function allerDashboard() {
   cursor: pointer;
   transition: all 0.2s;
 }
-.btn-action:hover { background: var(--vert-dark); transform: translateY(-1px); }
+.btn-action:hover:not(:disabled) { background: var(--vert-dark); transform: translateY(-1px); }
+.btn-action:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-plus-tard {
+  display: block;
+  margin: 12px auto 0;
+  background: none;
+  border: none;
+  color: var(--texte-sec);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.btn-plus-tard:hover { color: var(--texte); }
+.ob-unites-reminder {
+  max-width: 480px;
+  margin: 12px auto 0;
+  background: #fff7e0;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ATTENTE VALIDATION */
+.ob-attente-validation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #fff7e0, #fde9b8);
+  border: 1px solid #fde68a;
+  color: #92400e;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ob-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(146,64,14,0.3);
+  border-top-color: #92400e;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* UNITÉS */
+.ob-unites-options { display: flex; gap: 10px; margin-bottom: 14px; }
+.ob-unite-option {
+  flex: 1;
+  border: 1.5px solid var(--bordure);
+  border-radius: 12px;
+  padding: 14px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+.ob-unite-option.selected { border-color: var(--vert); background: var(--vert-light); }
+.ob-unite-icon { font-size: 20px; display: block; margin-bottom: 6px; }
+.ob-unite-type { font-size: 13px; font-weight: 700; margin: 0 0 2px; color: var(--texte); }
+.ob-unite-prix { font-size: 12px; font-weight: 600; color: var(--vert); margin: 0 0 2px; }
+.ob-unite-quota { font-size: 11px; color: var(--texte-sec); margin: 0; }
+
+/* PROFIL */
+.ob-profil-photo {
+  width: 100%;
+  max-width: 220px;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  border: 1.5px dashed var(--bordure);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 13px;
+  color: var(--texte-sec);
+  cursor: pointer;
+  overflow: hidden;
+  margin-bottom: 14px;
+  transition: border-color 0.2s;
+}
+.ob-profil-photo:hover { border-color: var(--vert); }
+.ob-profil-photo img { width: 100%; height: 100%; object-fit: cover; }
+.ob-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px 14px;
+  border: 1px solid var(--bordure);
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+  margin-bottom: 14px;
+}
+.ob-textarea:focus { border-color: var(--vert); outline: none; }
 
 /* TERMINÉ */
 .ob-termine {
@@ -309,21 +578,4 @@ function allerDashboard() {
   transition: all 0.2s;
 }
 .btn-dashboard:hover { background: var(--vert-dark); transform: translateY(-1px); }
-
-/* SKIP */
-.ob-skip {
-  text-align: center;
-  max-width: 680px;
-  margin: 0 auto;
-}
-.ob-skip button {
-  background: none;
-  border: none;
-  color: var(--texte-sec);
-  font-size: 13px;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.ob-skip button:hover { color: var(--texte); }
 </style>

@@ -37,7 +37,8 @@ exports.inscription = async (req, res) => {
         email: user.email,
         role: user.role,
         commune: user.commune,
-        photoUrl: user.photoUrl
+        photoUrl: user.photoUrl,
+        coursiere: user.role === 'coursiere' ? user.coursiere : undefined
       }
     })
   } catch (err) {
