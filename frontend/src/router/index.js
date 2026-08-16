@@ -18,6 +18,11 @@ const routes = [
     component: () => import('../views/auth/Register.vue')
   },
   {
+    path: '/coursier',
+    name: 'RegisterCoursiere',
+    component: () => import('../views/auth/RegisterCoursiere.vue')
+  },
+  {
     path: '/client/dashboard',
     name: 'ClientDashboard',
     component: () => import('../views/client/Dashboard.vue'),
@@ -67,7 +72,7 @@ router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
 
   // Si connecté et essaie d'aller sur login/inscription → rediriger dashboard
-  if ((to.name === 'Login' || to.name === 'Register') && authStore.token) {
+  if ((to.name === 'Login' || to.name === 'Register' || to.name === 'RegisterCoursiere') && authStore.token) {
     return next(authStore.getDashboardRoute())
   }
 

@@ -2,8 +2,8 @@
   <div class="auth-page">
     <div class="auth-card card">
       <div class="auth-logo">🛍️ Achètlà</div>
-      <h1>Inscription</h1>
-      <p class="auth-sub">Rejoignez Achètlà dès aujourd'hui</p>
+      <h1>Devenir coursière</h1>
+      <p class="auth-sub">Rejoignez l'équipe et transformez votre connaissance du marché en revenu</p>
       <div v-if="erreur" class="erreur-msg">{{ erreur }}</div>
       <form @submit.prevent="sInscrire">
         <div class="form-row">
@@ -36,7 +36,7 @@
           <input v-model="form.motDePasse" type="password" placeholder="••••••••" maxlength="72" required />
         </div>
         <button type="submit" class="btn-primary w-full" :disabled="chargement">
-          {{ chargement ? 'Inscription...' : "S'inscrire" }}
+          {{ chargement ? 'Inscription...' : "S'inscrire comme coursière" }}
         </button>
       </form>
       <p class="auth-link">
@@ -95,12 +95,12 @@ async function sInscrire() {
       pseudo: form.value.pseudo,
       telephone: form.value.telephone,
       commune: form.value.commune,
-      role: 'client',
+      role: 'coursiere',
       motDePasse: form.value.motDePasse
     })
     authStore.connecter(res.data.token, res.data.user)
     toast.success(`Bienvenue ${res.data.user.prenom} ! 🎉`)
-    router.push(authStore.getDashboardRoute())
+    router.push('/coursiere/onboarding')
   } catch (e) {
     erreur.value = e.response?.data?.message || "Erreur lors de l'inscription"
     toast.error(erreur.value)
