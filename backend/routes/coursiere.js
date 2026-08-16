@@ -45,6 +45,7 @@ router.post('/photo', proteger, autoriser('coursiere'), uploadPhoto.single('phot
     const nomFichier = `${req.user._id}-${Date.now()}.jpg`
     const cheminFinal = path.join(DOSSIER_PHOTOS, nomFichier)
     await sharp(req.file.buffer)
+      .rotate() // sans argument : réoriente selon l'EXIF (photos de téléphone stockées "à plat")
       .resize(TAILLE_FINALE_PX, TAILLE_FINALE_PX, { fit: 'cover', position: 'attention' })
       .jpeg({ quality: 85 })
       .toFile(cheminFinal)
@@ -59,6 +60,21 @@ router.post('/photo', proteger, autoriser('coursiere'), uploadPhoto.single('phot
     }
 
     res.json({ succes: true, photoUrl })
+  } catch (err) {
+    res.status(500).json({ succes: false, message: err.message })
+  }
+})
+
+// DELETE /api/coursiere/photo — Supprime la photo de profil
+router.delete('/photo', proteger, autoriser('coursiere'), async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('photoUrl')
+    if (user?.photoUrl) {
+      const chemin = path.join(DOSSIER_PHOTOS, path.basename(user.photoUrl))
+      fs.unlink(chemin, () => {})
+    }
+    await User.findByIdAndUpdate(req.user._id, { photoUrl: null })
+    res.json({ succes: true, message: 'Photo supprimée' })
   } catch (err) {
     res.status(500).json({ succes: false, message: err.message })
   }

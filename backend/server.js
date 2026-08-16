@@ -2,13 +2,24 @@ const express = require('express')
 const mongoose = require('mongoose')
 const cors = require('cors')
 const path = require('path')
-const { createServer } = require('http')
+const fs = require('fs')
+const { createServer: createHttpServer } = require('http')
+const { createServer: createHttpsServer } = require('https')
 const { init: initSocket } = require('./socket')
 const corsOrigins = require('./utils/corsOrigins')
 require('dotenv').config()
 
 const app = express()
-const httpServer = createServer(app)
+
+// Certificat mkcert local (généré par frontend/scripts/set-lan-ip.js) : permet le HTTPS
+// en dev, requis par certaines API navigateur (géolocalisation) sur mobile. Retombe sur
+// du HTTP simple si les certificats n'existent pas encore (première installation, autre machine).
+const CHEMIN_CERT = path.join(__dirname, '..', 'certs', 'dev.pem')
+const CHEMIN_CLE = path.join(__dirname, '..', 'certs', 'dev-key.pem')
+const httpsDisponible = fs.existsSync(CHEMIN_CERT) && fs.existsSync(CHEMIN_CLE)
+const httpServer = httpsDisponible
+  ? createHttpsServer({ cert: fs.readFileSync(CHEMIN_CERT), key: fs.readFileSync(CHEMIN_CLE) }, app)
+  : createHttpServer(app)
 const io = initSocket(httpServer)
 app.use(cors({
   origin: corsOrigins.origin,
@@ -62,10 +73,10 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connecté')
     httpServer.listen(process.env.PORT, () => {
-      console.log(`✅ Serveur sur le port ${process.env.PORT}`)
+      console.log(`✅ Serveur sur le port ${process.env.PORT} (${httpsDisponible ? 'HTTPS' : 'HTTP'})`)
     })
   })
   .catch(err => {
     console.error('❌ Erreur MongoDB :', err.message)
     process.exit(1)
-  })
+  }) 

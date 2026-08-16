@@ -180,7 +180,7 @@
         <div class="card">
           <h3 class="card-title">👩🏾 Mon profil</h3>
           <div class="profil-info">
-            <div class="profil-avatar-wrap" @click="declencherChoixPhoto">
+            <div class="profil-avatar-wrap" ref="avatarWrapRef" @click="showPhotoMenu = !showPhotoMenu">
               <div class="profil-avatar">
                 <img v-if="photoUrl" :src="photoUrl" alt="Photo de profil" />
                 <span v-else>{{ initiales }}</span>
@@ -191,6 +191,24 @@
               </div>
               <span class="avatar-edit-badge" v-if="!uploadingPhoto">📷</span>
               <input ref="photoInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden @change="onPhotoChoisie" />
+
+              <Transition name="avatar-menu-pop">
+                <div class="avatar-menu" v-if="showPhotoMenu" @click.stop>
+                  <button @click="declencherChoixPhoto(); showPhotoMenu = false">
+                    📷 {{ photoUrl ? 'Changer la photo' : 'Ajouter une photo' }}
+                  </button>
+                  <button v-if="photoUrl && !confirmerSuppressionPhoto" class="danger" @click="confirmerSuppressionPhoto = true">
+                    🗑️ Supprimer la photo
+                  </button>
+                  <div v-if="confirmerSuppressionPhoto" class="avatar-menu-confirm">
+                    <p>Vraiment supprimer ?</p>
+                    <div class="avatar-menu-confirm-btns">
+                      <button class="danger" @click="supprimerPhoto">Oui, supprimer</button>
+                      <button @click="confirmerSuppressionPhoto = false">Annuler</button>
+                    </div>
+                  </div>
+                </div>
+              </Transition>
             </div>
             <div class="profil-details">
               <p class="profil-nom">{{ authStore.user?.prenom }} {{ authStore.user?.nom }}</p>
@@ -243,6 +261,25 @@
         </Transition>
         <button class="tarif-cta" @click="(e) => { ripple(e); choisirTarifEtAcheter() }">
           Choisir {{ profilAffiche === 'standard' ? 'Standard' : 'Premium' }} →
+        </button>
+      </div>
+    </div>
+
+    <!-- MODALE ROTATION PHOTO -->
+    <div class="modal-overlay" v-if="photoPreviewUrl" @click.self="annulerPhoto">
+      <div class="modal">
+        <button class="modal-close" @click="annulerPhoto">✕</button>
+        <div class="modal-icon">📸</div>
+        <h3>Ajuster votre photo</h3>
+        <div class="photo-rotation-preview">
+          <img :src="photoPreviewUrl" :style="{ transform: `rotate(${rotationDegres}deg)` }" />
+        </div>
+        <div class="rotate-controls">
+          <button type="button" class="btn-rotate" @click="rotationDegres = (rotationDegres + 270) % 360" title="Pivoter à gauche">↺</button>
+          <button type="button" class="btn-rotate" @click="rotationDegres = (rotationDegres + 90) % 360" title="Pivoter à droite">↻</button>
+        </div>
+        <button class="btn-valider-photo" @click="validerPhotoRotation" :disabled="uploadingPhoto">
+          {{ uploadingPhoto ? 'Envoi...' : '✓ Valider cette photo' }}
         </button>
       </div>
     </div>
@@ -361,6 +398,19 @@ const apiOrigin = api.defaults.baseURL.replace(/\/api\/?$/, '')
 const photoUrl = computed(() => authStore.user?.photoUrl ? apiOrigin + authStore.user.photoUrl : null)
 const photoInput = ref(null)
 const uploadingPhoto = ref(false)
+const photoFichier = ref(null)
+const photoPreviewUrl = ref(null)
+const rotationDegres = ref(0)
+const showPhotoMenu = ref(false)
+const confirmerSuppressionPhoto = ref(false)
+const avatarWrapRef = ref(null)
+
+function fermerMenuSiExterieur(e) {
+  if (avatarWrapRef.value && !avatarWrapRef.value.contains(e.target)) {
+    showPhotoMenu.value = false
+    confirmerSuppressionPhoto.value = false
+  }
+}
 
 function ripple(e) {
   const btn = e.currentTarget
@@ -384,24 +434,94 @@ function declencherChoixPhoto() {
   photoInput.value?.click()
 }
 
-async function onPhotoChoisie(e) {
+function onPhotoChoisie(e) {
   const file = e.target.files[0]
   if (!file) return
+  if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value)
+  photoFichier.value = file
+  photoPreviewUrl.value = URL.createObjectURL(file)
+  rotationDegres.value = 0
+  e.target.value = ''
+}
 
+function annulerPhoto() {
+  if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value)
+  photoFichier.value = null
+  photoPreviewUrl.value = null
+  rotationDegres.value = 0
+}
+
+// Décode le fichier en respectant son orientation EXIF (une photo de téléphone est souvent
+// stockée "à plat" avec une métadonnée qui dit comment l'afficher) puis redessine sur un
+// canvas pivoté. Sans ça, la rotation manuelle partirait d'une base différente de ce que
+// l'utilisatrice voit réellement dans l'aperçu, et le résultat semblerait aléatoire.
+async function decoderImageOrientee(file) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await createImageBitmap(file, { imageOrientation: 'from-image' })
+    } catch {
+      // Certains navigateurs plus anciens ne supportent pas l'option, on retombe plus bas
+    }
+  }
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img) }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible')) }
+    img.src = url
+  })
+}
+
+async function rotationVersBlob(file, degres) {
+  const source = await decoderImageOrientee(file)
+  const largeur = source.width ?? source.naturalWidth
+  const hauteur = source.height ?? source.naturalHeight
+  const swap = degres % 180 !== 0
+  const canvas = document.createElement('canvas')
+  canvas.width = swap ? hauteur : largeur
+  canvas.height = swap ? largeur : hauteur
+  const ctx = canvas.getContext('2d')
+  ctx.translate(canvas.width / 2, canvas.height / 2)
+  ctx.rotate(degres * Math.PI / 180)
+  ctx.drawImage(source, -largeur / 2, -hauteur / 2)
+  if (source.close) source.close()
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Échec de la rotation')), 'image/jpeg', 0.92)
+  })
+}
+
+async function validerPhotoRotation() {
+  if (!photoFichier.value) return
   uploadingPhoto.value = true
-  const formData = new FormData()
-  formData.append('photo', file)
   try {
-    const res = await api.post('/coursiere/photo', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    const blob = rotationDegres.value === 0
+      ? photoFichier.value
+      : await rotationVersBlob(photoFichier.value, rotationDegres.value)
+    const formData = new FormData()
+    formData.append('photo', blob, 'photo.jpg')
+    const res = await api.post('/coursiere/photo', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
     authStore.mettreAJourUser({ photoUrl: res.data.photoUrl })
     toast.success('Photo de profil mise à jour 📸')
+    annulerPhoto()
   } catch (err) {
     toast.error(err.response?.data?.message || 'Erreur lors de l\'envoi de la photo')
   } finally {
     uploadingPhoto.value = false
-    e.target.value = ''
+  }
+}
+
+async function supprimerPhoto() {
+  uploadingPhoto.value = true
+  try {
+    await api.delete('/coursiere/photo')
+    authStore.mettreAJourUser({ photoUrl: null })
+    toast.success('Photo supprimée')
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Erreur lors de la suppression de la photo')
+  } finally {
+    uploadingPhoto.value = false
+    confirmerSuppressionPhoto.value = false
+    showPhotoMenu.value = false
   }
 }
 
@@ -609,6 +729,8 @@ onMounted(async () => {
   restaurerCourseEnCours()
 
   if (statut.value === 'disponible') demarrerSuiviPosition()
+
+  document.addEventListener('click', fermerMenuSiExterieur)
 })
 
 onUnmounted(() => {
@@ -619,6 +741,7 @@ onUnmounted(() => {
   socket.off('livraison_maj')
   socket.off('statut_change')
   if (socket.connected) socket.disconnect()
+  document.removeEventListener('click', fermerMenuSiExterieur)
 })
 
 async function toggleStatut() {
@@ -1112,6 +1235,35 @@ async function commanderLivraison() {
   display: flex; align-items: center; justify-content: center;
   font-size: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.25);
 }
+.avatar-menu {
+  position: absolute; top: calc(100% + 8px); left: 0;
+  background: white; border-radius: 12px; padding: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18); border: 0.5px solid var(--bordure);
+  min-width: 190px; z-index: 20; cursor: default;
+}
+.avatar-menu button {
+  display: block; width: 100%; text-align: left;
+  padding: 10px 12px; border: none; background: none;
+  border-radius: 8px; font-size: 13px; font-weight: 600;
+  color: var(--texte); cursor: pointer; transition: background 0.15s ease;
+  white-space: nowrap;
+}
+.avatar-menu button:hover { background: var(--fond); }
+.avatar-menu button.danger { color: #dc2626; }
+.avatar-menu button.danger:hover { background: #fef2f2; }
+.avatar-menu-confirm { padding: 10px 12px; }
+.avatar-menu-confirm p { font-size: 13px; font-weight: 600; color: var(--texte); margin: 0 0 10px; }
+.avatar-menu-confirm-btns { display: flex; gap: 8px; }
+.avatar-menu-confirm-btns button {
+  flex: 1; padding: 8px; border-radius: 8px; border: none;
+  font-size: 12px; font-weight: 700; cursor: pointer; text-align: center;
+}
+.avatar-menu-confirm-btns button.danger { background: #dc2626; color: white; }
+.avatar-menu-confirm-btns button.danger:hover { background: #b91c1c; }
+.avatar-menu-confirm-btns button:not(.danger) { background: var(--fond); color: var(--texte-sec); }
+.avatar-menu-confirm-btns button:not(.danger):hover { background: var(--bordure); }
+.avatar-menu-pop-enter-active, .avatar-menu-pop-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.avatar-menu-pop-enter-from, .avatar-menu-pop-leave-to { opacity: 0; transform: translateY(-6px) scale(0.96); }
 .profil-nom { font-size: 15px; font-weight: 700; margin: 0 0 2px; color: var(--texte); }
 .profil-commune { font-size: 12px; color: var(--texte-sec); margin: 0; }
 .profil-items { display: flex; flex-direction: column; gap: 10px; }
@@ -1138,6 +1290,16 @@ async function commanderLivraison() {
 .unite-quota { font-size: 11px; color: var(--texte-sec); margin: 0; }
 .btn-payer-unite { width: 100%; padding: 14px; background: #1d4ed8; color: white; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
 .btn-payer-unite:hover { background: #1e40af; }
+
+/* ROTATION PHOTO */
+.photo-rotation-preview { width: 200px; height: 200px; margin: 0 auto 16px; border-radius: 14px; overflow: hidden; background: var(--fond); }
+.photo-rotation-preview img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s ease; }
+.rotate-controls { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; }
+.btn-rotate { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--bordure); background: white; font-size: 18px; cursor: pointer; transition: all 0.2s; }
+.btn-rotate:hover { border-color: var(--vert); background: var(--vert-light); }
+.btn-valider-photo { width: 100%; padding: 14px; background: var(--vert); color: white; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+.btn-valider-photo:hover:not(:disabled) { background: var(--vert-dark); }
+.btn-valider-photo:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* TCHAT MODAL */
 .tchat-modal { max-width: 480px; text-align: left; padding: 0; overflow: hidden; }

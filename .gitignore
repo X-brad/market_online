@@ -20,6 +20,10 @@
 # Photos de profil uploadées
 backend/uploads/
 
+# Certificat HTTPS local (mkcert) — spécifique à chaque machine, jamais partagé
+.tools/
+certs/
+
 # Logs
 *.log
 

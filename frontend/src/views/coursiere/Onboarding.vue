@@ -89,11 +89,20 @@
 
             <!-- Étape 5 : profil (photo + description) -->
             <div class="ob-etape-action ob-profil" v-if="!e.faite && i === etapeActive && e.id === 5">
-              <div class="ob-profil-photo" @click="photoInput?.click()">
-                <img v-if="authStore.user?.photoUrl" :src="apiOrigin + authStore.user.photoUrl" />
+              <div class="ob-profil-photo" @click="!photoPreviewUrl && photoInput?.click()">
+                <img v-if="photoPreviewUrl" :src="photoPreviewUrl" :style="{ transform: `rotate(${rotationDegres}deg)` }" class="photo-en-rotation" />
+                <img v-else-if="authStore.user?.photoUrl" :src="apiOrigin + authStore.user.photoUrl" />
                 <span v-else>📷 Ajouter une photo</span>
               </div>
-              <p class="ob-photo-hint">Votre photo sera automatiquement recadrée en carré.</p>
+              <div class="ob-rotate-controls" v-if="photoPreviewUrl">
+                <button type="button" class="btn-rotate" @click="rotationDegres = (rotationDegres + 270) % 360" title="Pivoter à gauche">↺</button>
+                <button type="button" class="btn-rotate" @click="rotationDegres = (rotationDegres + 90) % 360" title="Pivoter à droite">↻</button>
+                <button type="button" class="btn-valider-photo" @click="validerPhotoRotation" :disabled="chargementAction">
+                  {{ chargementAction ? 'Envoi...' : '✓ Valider cette photo' }}
+                </button>
+                <button type="button" class="btn-annuler-photo" @click="annulerPhoto">Annuler</button>
+              </div>
+              <p class="ob-photo-hint" v-else>Votre photo sera automatiquement recadrée en carré. Vous pourrez la faire pivoter si besoin.</p>
               <textarea
                 v-model="description"
                 maxlength="500"
@@ -139,6 +148,9 @@ const router = useRouter()
 const apiOrigin = api.defaults.baseURL.replace(/\/api\/?$/, '')
 const chargementAction = ref(false)
 const photoInput = ref(null)
+const photoFichier = ref(null)
+const photoPreviewUrl = ref(null)
+const rotationDegres = ref(0)
 const description = ref(authStore.user?.coursiere?.description || '')
 const uniteChoisie = ref('Standard')
 const unitesSautees = ref(false)
@@ -266,22 +278,79 @@ async function activerDisponible() {
   }
 }
 
-async function onPhotoChoisie(e) {
+function onPhotoChoisie(e) {
   const file = e.target.files[0]
   if (!file) return
+  if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value)
+  photoFichier.value = file
+  photoPreviewUrl.value = URL.createObjectURL(file)
+  rotationDegres.value = 0
+}
 
+function annulerPhoto() {
+  if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value)
+  photoFichier.value = null
+  photoPreviewUrl.value = null
+  rotationDegres.value = 0
+  if (photoInput.value) photoInput.value.value = ''
+}
+
+// Décode le fichier en respectant son orientation EXIF (une photo de téléphone est souvent
+// stockée "à plat" avec une métadonnée qui dit comment l'afficher) puis redessine sur un
+// canvas pivoté. Sans ça, la rotation manuelle partirait d'une base différente de ce que
+// l'utilisatrice voit réellement dans l'aperçu, et le résultat semblerait aléatoire.
+async function decoderImageOrientee(file) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await createImageBitmap(file, { imageOrientation: 'from-image' })
+    } catch {
+      // Certains navigateurs plus anciens ne supportent pas l'option, on retombe plus bas
+    }
+  }
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img) }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible')) }
+    img.src = url
+  })
+}
+
+async function rotationVersBlob(file, degres) {
+  const source = await decoderImageOrientee(file)
+  const largeur = source.width ?? source.naturalWidth
+  const hauteur = source.height ?? source.naturalHeight
+  const swap = degres % 180 !== 0
+  const canvas = document.createElement('canvas')
+  canvas.width = swap ? hauteur : largeur
+  canvas.height = swap ? largeur : hauteur
+  const ctx = canvas.getContext('2d')
+  ctx.translate(canvas.width / 2, canvas.height / 2)
+  ctx.rotate(degres * Math.PI / 180)
+  ctx.drawImage(source, -largeur / 2, -hauteur / 2)
+  if (source.close) source.close()
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Échec de la rotation')), 'image/jpeg', 0.92)
+  })
+}
+
+async function validerPhotoRotation() {
+  if (!photoFichier.value) return
   chargementAction.value = true
-  const formData = new FormData()
-  formData.append('photo', file)
   try {
+    const blob = rotationDegres.value === 0
+      ? photoFichier.value
+      : await rotationVersBlob(photoFichier.value, rotationDegres.value)
+    const formData = new FormData()
+    formData.append('photo', blob, 'photo.jpg')
     const res = await api.post('/coursiere/photo', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
     authStore.mettreAJourUser({ photoUrl: res.data.photoUrl })
     toast.success('Photo ajoutée 📸')
+    annulerPhoto()
   } catch (err) {
     toast.error(err.response?.data?.message || 'Erreur lors de l\'envoi de la photo')
   } finally {
     chargementAction.value = false
-    e.target.value = ''
   }
 }
 
@@ -534,8 +603,43 @@ onUnmounted(() => {
   transition: border-color 0.2s;
 }
 .ob-profil-photo:hover { border-color: var(--vert); }
-.ob-profil-photo img { width: 100%; height: 100%; object-fit: cover; }
+.ob-profil-photo img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s ease; }
 .ob-photo-hint { font-size: 12px; color: var(--texte-sec); margin: 0 0 14px; }
+.ob-rotate-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.btn-rotate {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--bordure);
+  background: white;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.btn-rotate:hover { border-color: var(--vert); background: var(--vert-light); }
+.btn-valider-photo {
+  padding: 10px 18px;
+  background: var(--vert);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-valider-photo:hover:not(:disabled) { background: var(--vert-dark); }
+.btn-valider-photo:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-annuler-photo {
+  background: none;
+  border: none;
+  color: var(--texte-sec);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.btn-annuler-photo:hover { color: var(--texte); }
 .ob-textarea {
   width: 100%;
   min-height: 80px;
