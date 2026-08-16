@@ -103,8 +103,14 @@
             @mouseleave="activeStep = 0"
             @click="ouvrirModal(s.action)"
           >
-            <div class="step-icon">{{ s.icon }}</div>
-            <div class="step-num">{{ s.num }}</div>
+            <div class="step-top">
+              <span class="step-icon-badge" :class="s.svg">
+                <svg v-if="s.svg === 'search'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
+                <svg v-else-if="s.svg === 'chat'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.1-.6L3 21l1.7-5.1A8.4 8.4 0 0 1 3.5 12 8.4 8.4 0 0 1 12 3.6a8.4 8.4 0 0 1 9 7.9Z"/></svg>
+                <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-7 9 7"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
+              </span>
+              <span class="step-num">{{ s.num }}</span>
+            </div>
             <h3>{{ s.titre }}</h3>
             <p>{{ s.desc }}</p>
             <span class="step-cta">{{ s.cta }} →</span>
@@ -304,7 +310,7 @@ const stats = [
 const steps = [
   {
     num: '01',
-    icon: '🔍',
+    svg: 'search',
     titre: 'Cherchez une coursière',
     desc: 'Tapez votre besoin, choisissez votre marché. Le système trouve la meilleure coursière disponible dans votre commune.',
     action: 'chercher une coursière',
@@ -312,7 +318,7 @@ const steps = [
   },
   {
     num: '02',
-    icon: '💬',
+    svg: 'chat',
     titre: 'Échangez et payez',
     desc: 'Discutez via le tchat intégré, précisez votre liste. Payez via Mobile Money en toute sécurité.',
     action: 'échanger avec une coursière',
@@ -320,7 +326,7 @@ const steps = [
   },
   {
     num: '03',
-    icon: '🏠',
+    svg: 'home',
     titre: 'Recevez à domicile',
     desc: 'Votre coursière fait les achats et vous livre. Produits frais garantis, directement du marché.',
     action: 'recevoir votre marché',
@@ -560,8 +566,17 @@ const whys = [
   transform: translateY(-4px);
   box-shadow: 0 12px 32px rgba(29,158,117,0.15);
 }
-.step-icon { font-size: 36px; margin-bottom: 12px; display: block; }
-.step-num { font-size: 13px; font-weight: 700; color: var(--vert); letter-spacing: 1px; margin-bottom: 10px; }
+.step-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.step-icon-badge {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--vert-light); color: var(--vert-dark);
+  transition: all 0.3s;
+}
+.step-icon-badge.chat { background: var(--dore-light); color: var(--dore-dark); }
+.step:hover .step-icon-badge, .step.active .step-icon-badge { background: var(--vert); color: white; }
+.step-num { font-size: 24px; font-weight: 800; color: var(--bordure); letter-spacing: -0.5px; }
+.step:hover .step-num, .step.active .step-num { color: var(--vert-light); }
 .step h3 { font-size: 18px; font-weight: 700; color: var(--texte); margin-bottom: 10px; }
 .step p { font-size: 14px; color: var(--texte-sec); line-height: 1.7; margin-bottom: 16px; }
 .step-cta { font-size: 13px; font-weight: 700; color: var(--vert); display: inline-block; transition: transform 0.2s; }
