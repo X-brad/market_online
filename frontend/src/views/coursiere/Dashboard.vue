@@ -12,7 +12,7 @@
             </div>
             <div>
               <h1>Bonjour, {{ authStore.user?.prenom }} 👋</h1>
-              <p>📍 {{ authStore.user?.commune }} · Coursière MamiMarché</p>
+              <p>📍 {{ authStore.user?.commune }} · Coursière Achètlà</p>
             </div>
           </div>
           <div class="dash-right">

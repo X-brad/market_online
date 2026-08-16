@@ -4,7 +4,13 @@
 
       <!-- LOGO -->
       <RouterLink to="/" class="logo">
-        🛍️ MamiMarché
+        <span class="logo-mark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M4 9h16l-1.5 9a2 2 0 0 1-2 1.7H7.5a2 2 0 0 1-2-1.7L4 9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M8 9V7a4 4 0 0 1 8 0v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="logo-word">Achèt<span class="logo-accent">là</span></span>
       </RouterLink>
 
       <!-- NON CONNECTÉ -->
@@ -126,11 +132,30 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
   justify-content: space-between;
 }
 .logo {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--vert-dark);
+  display: flex;
+  align-items: center;
+  gap: 8px;
   text-decoration: none;
 }
+.logo-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--vert-dark), var(--vert));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(8,80,65,0.25);
+  flex-shrink: 0;
+}
+.logo-word {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--vert-dark);
+  letter-spacing: -0.2px;
+}
+.logo-accent { color: var(--dore); }
 .nav-links {
   display: flex;
   align-items: center;
@@ -250,7 +275,8 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 /* MOBILE */
 @media (max-width: 640px) {
   .nav-inner { flex-wrap: wrap; row-gap: 8px; }
-  .logo { font-size: 17px; }
+  .logo-mark { width: 28px; height: 28px; }
+  .logo-word { font-size: 16px; }
   .nav-links { gap: 6px; }
   .nav-link { padding: 8px 10px; font-size: 13px; white-space: nowrap; }
   .nav-prenom { display: none; }

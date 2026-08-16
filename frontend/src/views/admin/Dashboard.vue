@@ -3,7 +3,7 @@
 
     <!-- SIDEBAR -->
     <div class="sidebar">
-      <div class="sidebar-logo">🛍️ MamiMarché</div>
+      <div class="sidebar-logo">🛍️ Achètlà</div>
       <p class="sidebar-role">Back-office Admin</p>
       <nav class="sidebar-nav">
         <button
@@ -389,6 +389,71 @@
         </div>
       </div>
 
+      <!-- TÉMOIGNAGES -->
+      <div v-if="activeMenu === 'temoignages'" class="content">
+        <div class="toolbar">
+          <button class="btn-save" @click="ouvrirModalTemoignage()">+ Ajouter un témoignage</button>
+        </div>
+        <div class="temoignages-admin-grid">
+          <div class="card temoignage-admin-card" v-for="t in temoignages" :key="t._id">
+            <div class="temoignage-admin-header">
+              <div class="temoignage-admin-photo">
+                <img v-if="t.photoUrl" :src="apiOrigin + t.photoUrl" />
+                <span v-else>👤</span>
+              </div>
+              <div>
+                <p class="temoignage-admin-nom">{{ t.nomClient }}</p>
+                <span>{{ new Date(t.createdAt).toLocaleDateString('fr-FR') }}</span>
+              </div>
+            </div>
+            <p class="temoignage-admin-texte">"{{ t.texte }}"</p>
+            <div class="action-btns">
+              <button class="btn-sm gray" @click="ouvrirModalTemoignage(t)">✏️</button>
+              <button class="btn-sm red" @click="temoignageASupprimer = t">🗑</button>
+            </div>
+          </div>
+        </div>
+        <div class="empty-state" v-if="temoignages.length === 0">
+          <span>💬</span>
+          <p>Aucun témoignage pour le moment</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MODALE AJOUT/ÉDITION TÉMOIGNAGE -->
+    <div class="modal-overlay" v-if="temoignageModalOuvert" @click.self="fermerModalTemoignage">
+      <div class="modal modal-form">
+        <button class="modal-close" @click="fermerModalTemoignage">✕</button>
+        <h3>{{ temoignageEnEdition ? 'Modifier le témoignage' : 'Ajouter un témoignage' }}</h3>
+        <div class="temoignage-photo-picker" @click="temoignagePhotoInput?.click()">
+          <img v-if="temoignagePhotoPreview" :src="temoignagePhotoPreview" />
+          <span v-else>📷 Ajouter une photo</span>
+        </div>
+        <input ref="temoignagePhotoInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden @change="onTemoignagePhotoChoisie" />
+        <div class="form-group">
+          <label>Nom du client</label>
+          <input v-model="temoignageForm.nomClient" maxlength="80" class="form-input" placeholder="Ex : Aya Koffi" />
+        </div>
+        <div class="form-group">
+          <label>Témoignage</label>
+          <textarea v-model="temoignageForm.texte" maxlength="400" class="motif-textarea" placeholder="Ex : Livraison rapide, produits frais..."></textarea>
+        </div>
+        <button class="btn-save w-full" :disabled="!temoignageForm.nomClient.trim() || !temoignageForm.texte.trim() || enregistrementTemoignage" @click="enregistrerTemoignage">
+          {{ enregistrementTemoignage ? 'Enregistrement...' : (temoignageEnEdition ? '💾 Mettre à jour' : '+ Ajouter') }}
+        </button>
+      </div>
+    </div>
+
+    <!-- MODALE SUPPRESSION TÉMOIGNAGE -->
+    <div class="modal-overlay" v-if="temoignageASupprimer" @click.self="temoignageASupprimer = null">
+      <div class="modal">
+        <button class="modal-close" @click="temoignageASupprimer = null">✕</button>
+        <div class="modal-icon">🗑</div>
+        <h3>Supprimer ce témoignage ?</h3>
+        <p>Le témoignage de {{ temoignageASupprimer.nomClient }} sera définitivement supprimé et disparaîtra de la page d'accueil.</p>
+        <button class="btn-confirmer-suspension" @click="confirmerSuppressionTemoignage">Confirmer la suppression</button>
+      </div>
     </div>
 
     <!-- MODALE SUSPENSION -->
@@ -420,6 +485,7 @@ import api from '../../api/axios.js'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const apiOrigin = api.defaults.baseURL.replace(/\/api\/?$/, '')
 const activeMenu = ref('overview')
 const searchCoursiere = ref('')
 const filtreCoursiere = ref('tous')
@@ -438,6 +504,7 @@ const menus = [
   { id: 'transactions', icon: '💳', label: 'Transactions', desc: 'Suivi des paiements et revenus' },
   { id: 'litiges', icon: '⚠️', label: 'Litiges', desc: 'Gestion des conflits et signalements' },
   { id: 'marches', icon: '🏪', label: 'Marchés', desc: 'Activation et suivi des marchés' },
+  { id: 'temoignages', icon: '⭐', label: 'Témoignages', desc: 'Avis clients affichés sur la page d\'accueil' },
 ]
 
 const menuActif = computed(() => menus.find(m => m.id === activeMenu.value))
@@ -452,6 +519,15 @@ const clients = ref([])
 const searchClient = ref('')
 const suspensionCible = ref(null)
 const motifSaisi = ref('')
+const temoignages = ref([])
+const temoignageModalOuvert = ref(false)
+const temoignageEnEdition = ref(null)
+const temoignageForm = ref({ nomClient: '', texte: '' })
+const temoignagePhotoInput = ref(null)
+const temoignagePhotoFichier = ref(null)
+const temoignagePhotoPreview = ref(null)
+const temoignageASupprimer = ref(null)
+const enregistrementTemoignage = ref(false)
 const parametres = ref({
   unitePrixStandardVendeuse: 500,
   unitePrixStandardNonVendeuse: 600,
@@ -589,6 +665,15 @@ async function chargerParametres() {
   }
 }
 
+async function chargerTemoignages() {
+  try {
+    const res = await api.get('/temoignages')
+    temoignages.value = res.data.temoignages
+  } catch (err) {
+    console.error('Erreur témoignages:', err)
+  }
+}
+
 onMounted(() => {
   chargerStats()
   chargerCoursieres()
@@ -597,6 +682,7 @@ onMounted(() => {
   chargerLitiges()
   chargerMarches()
   chargerParametres()
+  chargerTemoignages()
 })
 
 async function validerCoursiere(c) {
@@ -671,6 +757,66 @@ async function toggleMarche(m) {
     showToast(`${m.nom} ${nouveauActif ? 'activé' : 'désactivé'}`)
   } catch (err) {
     showToast('Erreur lors de la mise à jour du marché', 'warning')
+  }
+}
+
+function ouvrirModalTemoignage(t = null) {
+  temoignageEnEdition.value = t
+  temoignageForm.value = { nomClient: t?.nomClient || '', texte: t?.texte || '' }
+  temoignagePhotoFichier.value = null
+  temoignagePhotoPreview.value = t?.photoUrl ? apiOrigin + t.photoUrl : null
+  temoignageModalOuvert.value = true
+}
+
+function fermerModalTemoignage() {
+  temoignageModalOuvert.value = false
+  temoignageEnEdition.value = null
+  temoignagePhotoFichier.value = null
+  temoignagePhotoPreview.value = null
+}
+
+function onTemoignagePhotoChoisie(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  temoignagePhotoFichier.value = file
+  temoignagePhotoPreview.value = URL.createObjectURL(file)
+}
+
+async function enregistrerTemoignage() {
+  enregistrementTemoignage.value = true
+  const formData = new FormData()
+  formData.append('nomClient', temoignageForm.value.nomClient.trim())
+  formData.append('texte', temoignageForm.value.texte.trim())
+  if (temoignagePhotoFichier.value) formData.append('photo', temoignagePhotoFichier.value)
+
+  try {
+    if (temoignageEnEdition.value) {
+      const res = await api.put(`/temoignages/${temoignageEnEdition.value._id}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const index = temoignages.value.findIndex(t => t._id === res.data.temoignage._id)
+      if (index !== -1) temoignages.value[index] = res.data.temoignage
+      showToast('💾 Témoignage mis à jour')
+    } else {
+      const res = await api.post('/temoignages', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      temoignages.value.unshift(res.data.temoignage)
+      showToast('✓ Témoignage ajouté')
+    }
+    fermerModalTemoignage()
+  } catch (err) {
+    showToast(err.response?.data?.message || 'Erreur lors de l\'enregistrement', 'warning')
+  } finally {
+    enregistrementTemoignage.value = false
+  }
+}
+
+async function confirmerSuppressionTemoignage() {
+  try {
+    await api.delete(`/temoignages/${temoignageASupprimer.value._id}`)
+    temoignages.value = temoignages.value.filter(t => t._id !== temoignageASupprimer.value._id)
+    showToast('🗑 Témoignage supprimé', 'warning')
+  } catch (err) {
+    showToast('Erreur lors de la suppression', 'warning')
+  } finally {
+    temoignageASupprimer.value = null
   }
 }
 </script>
@@ -820,6 +966,33 @@ async function toggleMarche(m) {
 .marche-admin-stats div { background: var(--fond); border-radius: 8px; padding: 10px; text-align: center; }
 .marche-admin-stats p { font-size: 18px; font-weight: 800; color: var(--vert-dark); margin: 0 0 2px; }
 .marche-admin-stats span { font-size: 11px; color: var(--texte-sec); }
+
+/* TÉMOIGNAGES ADMIN */
+.temoignages-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.temoignage-admin-card { display: flex; flex-direction: column; }
+.temoignage-admin-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.temoignage-admin-photo { width: 44px; height: 44px; border-radius: 50%; background: var(--fond); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.temoignage-admin-photo img { width: 100%; height: 100%; object-fit: cover; }
+.temoignage-admin-nom { font-size: 14px; font-weight: 700; margin: 0 0 2px; color: var(--texte); }
+.temoignage-admin-header span { font-size: 11px; color: var(--texte-sec); }
+.temoignage-admin-texte { font-size: 13px; color: var(--texte-sec); font-style: italic; line-height: 1.5; margin: 0 0 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* MODALE FORMULAIRE TÉMOIGNAGE */
+.modal-form { max-width: 380px; text-align: left; }
+.modal-form h3 { text-align: center; }
+.temoignage-photo-picker {
+  width: 100px; height: 100px; margin: 0 auto 20px; border-radius: 50%;
+  border: 1.5px dashed var(--bordure); display: flex; align-items: center; justify-content: center;
+  text-align: center; font-size: 12px; color: var(--texte-sec); cursor: pointer; overflow: hidden; transition: border-color 0.2s;
+}
+.temoignage-photo-picker:hover { border-color: var(--vert); }
+.temoignage-photo-picker img { width: 100%; height: 100%; object-fit: cover; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--texte); margin-bottom: 6px; }
+.form-input { width: 100%; padding: 10px 14px; border: 1px solid var(--bordure); border-radius: var(--radius); font-size: 14px; color: var(--texte); box-sizing: border-box; }
+.form-input:focus { border-color: var(--vert); outline: none; }
+.btn-save.w-full { width: 100%; margin-top: 0; }
+.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* TOGGLE */
 .toggle-switch { margin-left: auto; position: relative; width: 40px; height: 22px; flex-shrink: 0; }

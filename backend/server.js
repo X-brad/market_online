@@ -37,9 +37,10 @@ app.use('/api/messages', require('./routes/messages'))
 app.use('/api/litiges', require('./routes/litiges'))
 app.use('/api/marches', require('./routes/marches'))
 app.use('/api/parametres', require('./routes/parametres'))
+app.use('/api/temoignages', require('./routes/temoignages'))
 
 app.get('/', (req, res) => {
-  res.json({ message: 'MamiMarché API ✅' })
+  res.json({ message: 'Achètlà API ✅' })
 })
 
 // SOCKET.IO

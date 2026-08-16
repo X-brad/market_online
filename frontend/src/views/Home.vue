@@ -86,14 +86,14 @@
     </section>
 
     <!-- COMMENT ÇA MARCHE -->
-    <section class="how">
+    <section id="comment-ca-marche" class="how">
       <div class="container">
-        <div class="section-head">
+        <div class="section-head reveal">
           <span class="section-tag">Simple & rapide</span>
           <h2>Comment ça marche ?</h2>
           <p>3 étapes pour recevoir votre marché à domicile</p>
         </div>
-        <div class="steps">
+        <div class="steps reveal">
           <div
             v-for="(s, i) in steps"
             :key="s.titre"
@@ -114,77 +114,54 @@
     </section>
 
     <!-- MARCHÉS -->
-    <section class="marches">
+    <section id="marches" class="marches">
       <div class="container">
-        <div class="section-head">
+        <div class="section-head reveal">
           <span class="section-tag">Couverture</span>
           <h2>Marchés disponibles</h2>
           <p>Les marchés reconnus d'Abidjan, couverts dès le lancement</p>
         </div>
-        <div class="marches-grid">
+        <div class="marches-grid reveal">
           <div
             class="marche-card"
-            v-for="m in marches"
+            v-for="(m, i) in marches"
             :key="m.nom"
             @mouseenter="hoveredMarche = m.nom"
             @mouseleave="hoveredMarche = null"
             :class="{ hovered: hoveredMarche === m.nom }"
             @click="ouvrirModal('commander au ' + m.nom)"
           >
-            <span class="marche-icon">{{ m.icon }}</span>
-            <p class="marche-nom">{{ m.nom }}</p>
-            <p class="marche-commune">📍 {{ m.commune }}</p>
-            <span class="marche-badge">Actif</span>
+            <div class="marche-photo" :style="{ backgroundImage: 'url(' + marchePhotos[i % marchePhotos.length] + ')' }">
+              <span class="marche-icon-badge">{{ m.icon }}</span>
+            </div>
+            <div class="marche-info">
+              <p class="marche-nom">{{ m.nom }}</p>
+              <p class="marche-commune">📍 {{ m.commune }}</p>
+              <span class="marche-badge">Actif</span>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- DEVENEZ COURSIÈRE -->
-    <section class="devenir">
+    <!-- TÉMOIGNAGES -->
+    <section class="temoignages reveal" v-if="temoignages.length > 0">
       <div class="container">
         <div class="section-head">
-          <span class="section-tag">Rejoignez l'équipe</span>
-          <h2>Devenez coursière MamiMarché</h2>
-          <p>Voici concrètement ce qui se passe quand une course arrive</p>
+          <span class="section-tag">Ils nous font confiance</span>
+          <h2>Ce que disent nos clients</h2>
         </div>
-        <div class="devenir-grid">
-
-          <!-- DÉMO PARCOURS RÉEL -->
-          <div class="demo-phone-wrap">
-            <div class="demo-phone">
-              <div class="demo-progress-row">
-                <div class="demo-progress-seg" v-for="(e, i) in etapesDemo" :key="e.cle">
-                  <div
-                    class="demo-progress-fill"
-                    :class="{ filled: i < etapeDemoIndex }"
-                    :key="i === etapeDemoIndex ? 'live-' + timerRingKey : 'static-' + i"
-                    :style="i === etapeDemoIndex ? { animation: 'progressFill ' + DUREE_ETAPE_DEMO + 'ms linear forwards' } : {}"
-                  ></div>
-                </div>
+        <div class="temoignages-grid">
+          <div class="temoignage-card" v-for="t in temoignages" :key="t._id">
+            <p class="temoignage-texte">"{{ t.texte }}"</p>
+            <div class="temoignage-auteur">
+              <div class="temoignage-avatar">
+                <img v-if="t.photoUrl" :src="apiOrigin + t.photoUrl" :alt="t.nomClient" />
+                <span v-else>{{ initialesTemoignage(t.nomClient) }}</span>
               </div>
-              <Transition name="demo-swap" mode="out-in">
-                <div
-                  class="demo-etape-photo"
-                  :key="etapeDemoActuelle.cle"
-                  :style="{ backgroundImage: 'url(' + etapeDemoActuelle.image + ')' }"
-                >
-                  <div class="demo-scrim"></div>
-                  <span class="demo-badge-float">{{ etapeDemoActuelle.icon }}</span>
-                  <div class="demo-texte-bas">
-                    <p class="demo-titre">{{ etapeDemoActuelle.titre }}</p>
-                    <p class="demo-texte">{{ etapeDemoActuelle.texte }}</p>
-                  </div>
-                </div>
-              </Transition>
+              <p>{{ t.nomClient }}</p>
             </div>
-            <p class="demo-legende">↑ Aperçu réel de l'expérience coursière</p>
           </div>
-
-          <button class="devenir-cta" @click="ouvrirModal('devenir coursière')">
-            Rejoindre en tant que coursière →
-          </button>
-
         </div>
       </div>
     </section>
@@ -192,13 +169,18 @@
     <!-- POURQUOI NOUS -->
     <section class="why">
       <div class="container">
-        <div class="section-head">
+        <div class="section-head reveal">
           <span class="section-tag">Nos engagements</span>
-          <h2>Pourquoi MamiMarché ?</h2>
+          <h2>Pourquoi Achètlà ?</h2>
         </div>
-        <div class="why-grid">
+        <div class="why-grid reveal">
           <div class="why-card" v-for="w in whys" :key="w.titre">
-            <span class="why-icon">{{ w.icon }}</span>
+            <span class="why-icon-badge" :class="w.svg">
+              <svg v-if="w.svg === 'community'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1"/><circle cx="10" cy="7" r="3.2"/><path d="M22 20v-1a3.5 3.5 0 0 0-2.5-3.35"/><path d="M15.5 3.65a3.5 3.5 0 0 1 0 6.7"/></svg>
+              <svg v-else-if="w.svg === 'shield'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 5 6v6c0 4.6 3 7.9 7 9 4-1.1 7-4.4 7-9V6l-7-2.8Z"/><path d="m9.2 12.3 2 2 3.6-4"/></svg>
+              <svg v-else-if="w.svg === 'bolt'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+              <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.1-.6L3 21l1.7-5.1A8.4 8.4 0 0 1 3.5 12 8.4 8.4 0 0 1 12 3.6a8.4 8.4 0 0 1 9 7.9Z"/></svg>
+            </span>
             <h3>{{ w.titre }}</h3>
             <p>{{ w.desc }}</p>
           </div>
@@ -210,10 +192,9 @@
     <section class="cta">
       <div class="container cta-inner">
         <h2>Prêt à commander votre marché ?</h2>
-        <p>Rejoignez les familles d'Abidjan qui font confiance à MamiMarché</p>
+        <p>Rejoignez les familles d'Abidjan qui font confiance à Achètlà</p>
         <div class="cta-btns">
           <button class="btn-hero-primary" @click="ouvrirModal('commander')">Créer un compte gratuit</button>
-          <button class="btn-hero-outline" @click="ouvrirModal('devenir coursière')">Devenir coursière</button>
         </div>
       </div>
     </section>
@@ -222,15 +203,18 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useToastStore } from '../stores/toast'
 import api from '../api/axios.js'
 
 const toast = useToastStore()
+const apiOrigin = api.defaults.baseURL.replace(/\/api\/?$/, '')
 const activeStep = ref(0)
 const hoveredMarche = ref(null)
 const showModal = ref(false)
 const modalAction = ref('')
+const temoignages = ref([])
+let observer = null
 
 onMounted(async () => {
   try {
@@ -239,14 +223,34 @@ onMounted(async () => {
   } catch (err) {
     console.error('Erreur marchés:', err)
   }
+  try {
+    const res = await api.get('/temoignages')
+    temoignages.value = res.data.temoignages
+  } catch (err) {
+    console.error('Erreur témoignages:', err)
+  }
   heroInterval = setInterval(cyclerCandidat, 4500)
-  demoInterval = setInterval(avancerDemo, DUREE_ETAPE_DEMO)
+
+  await nextTick()
+  observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('revealed')
+        observer.unobserve(e.target)
+      }
+    })
+  }, { threshold: 0.15 })
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el))
 })
 
 onUnmounted(() => {
   clearInterval(heroInterval)
-  clearInterval(demoInterval)
+  observer?.disconnect()
 })
+
+function initialesTemoignage(nom) {
+  return nom.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
+}
 
 function ouvrirModal(action) {
   modalAction.value = action
@@ -291,24 +295,6 @@ function cyclerCandidat() {
   }, 1100)
 }
 
-// ── SECTION "DEVENEZ COURSIÈRE" : démo du parcours réel d'une course ──
-const etapesDemo = [
-  { cle: 'notif', icon: '🔔', titre: 'Nouvelle course disponible', texte: "Marché d'Adjamé · 2,5 km", image: 'https://images.unsplash.com/photo-1653762379954-8943c787e78b?w=900&h=560&fit=crop&q=80' },
-  { cle: 'acceptee', icon: '✅', titre: 'Course acceptée', texte: 'Cliente : Fatou D. · Liste reçue', image: 'https://images.unsplash.com/photo-1758600587355-fb8e9d5db5db?w=900&h=560&fit=crop&crop=focalpoint&fp-x=0.35&fp-y=0.5&q=80' },
-  { cle: 'route', icon: '🛵', titre: 'En route vers le marché', texte: 'Position GPS partagée en direct', image: 'https://images.unsplash.com/photo-1653725565489-dfddc2b4cbf0?w=900&h=560&fit=crop&q=80' },
-  { cle: 'gain', icon: '💰', titre: 'Course livrée', texte: 'Gain crédité sur votre compte', image: 'https://images.unsplash.com/photo-1743807059700-1d4d97003972?w=900&h=560&fit=crop&q=80' }
-]
-const etapeDemoIndex = ref(0)
-const etapeDemoActuelle = computed(() => etapesDemo[etapeDemoIndex.value])
-const DUREE_ETAPE_DEMO = 3200
-const timerRingKey = ref(0)
-let demoInterval = null
-
-function avancerDemo() {
-  etapeDemoIndex.value = (etapeDemoIndex.value + 1) % etapesDemo.length
-  timerRingKey.value++
-}
-
 const stats = [
   { val: '6', label: 'Marchés couverts' },
   { val: '2', label: 'Modes de livraison' },
@@ -351,11 +337,18 @@ const marches = ref([
   { nom: 'Marché de Bingerville', commune: 'Bingerville', icon: '🛒' }
 ])
 
+const marchePhotos = [
+  'https://images.unsplash.com/photo-1489450278009-822e9be04dff?w=500&h=380&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1609126986933-e3c84f19d49c?w=500&h=380&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1458917524587-d3236cc8c2c8?w=500&h=380&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1553787434-45e1d245bfbb?w=500&h=380&fit=crop&q=80'
+]
+
 const whys = [
-  { icon: '👩🏾', titre: 'Femmes du quartier', desc: 'Nos coursières connaissent les marchés, les vendeurs et les meilleurs prix. Une expertise locale unique.' },
-  { icon: '🔒', titre: 'Paiement sécurisé', desc: 'Votre argent est protégé via Mobile Money. Les fonds transitent par la plateforme en toute transparence.' },
-  { icon: '⚡', titre: 'Livraison rapide', desc: 'Grâce à la géolocalisation, on assigne la coursière la plus proche pour minimiser les délais.' },
-  { icon: '💬', titre: 'Communication directe', desc: 'Tchat et appel intégrés pour coordonner avec votre coursière sans exposer vos numéros personnels.' }
+  { svg: 'community', titre: 'Femmes du quartier', desc: 'Nos coursières connaissent les marchés, les vendeurs et les meilleurs prix. Une expertise locale unique.' },
+  { svg: 'shield', titre: 'Paiement sécurisé', desc: 'Votre argent est protégé via Mobile Money. Les fonds transitent par la plateforme en toute transparence.' },
+  { svg: 'bolt', titre: 'Livraison rapide', desc: 'Grâce à la géolocalisation, on assigne la coursière la plus proche pour minimiser les délais.' },
+  { svg: 'chat', titre: 'Communication directe', desc: 'Tchat et appel intégrés pour coordonner avec votre coursière sans exposer vos numéros personnels.' }
 ]
 </script>
 
@@ -434,7 +427,9 @@ const whys = [
 
 /* ── HERO ── */
 .hero {
-  background: linear-gradient(135deg, var(--vert-dark) 0%, var(--vert) 100%);
+  background:
+    linear-gradient(115deg, rgba(8,80,65,0.92) 0%, rgba(8,80,65,0.75) 42%, rgba(8,80,65,0.35) 100%),
+    url('https://images.unsplash.com/photo-1585540083814-ea6ee8af9e4f?w=1600&h=1000&fit=crop&q=80') center/cover;
   padding: 90px 0 80px;
   color: white;
   overflow: hidden;
@@ -505,12 +500,13 @@ const whys = [
 /* VISUAL */
 .hero-visual { position: relative; flex-shrink: 0; }
 .visual-card {
-  background: rgba(255,255,255,0.12);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.16);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255,255,255,0.3);
   border-radius: 16px;
   padding: 18px 20px;
   color: white;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.2);
 }
 .main-card { width: 280px; }
 .visual-header { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 14px; opacity: 0.85; }
@@ -573,12 +569,12 @@ const whys = [
 
 /* ── MARCHÉS ── */
 .marches { padding: 90px 0; background: white; }
-.marches-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+.marches-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
 .marche-card {
   background: var(--fond);
   border: 1.5px solid var(--bordure);
-  border-radius: 14px;
-  padding: 24px 20px;
+  border-radius: 16px;
+  overflow: hidden;
   text-align: center;
   transition: all 0.25s;
   cursor: pointer;
@@ -586,78 +582,44 @@ const whys = [
 }
 .marche-card:hover, .marche-card.hovered {
   border-color: var(--vert);
-  background: var(--vert-light);
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(29,158,117,0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(29,158,117,0.15);
 }
-.marche-icon { font-size: 32px; display: block; margin-bottom: 10px; }
+.marche-photo { position: relative; aspect-ratio: 4/3; background-size: cover; background-position: center; }
+.marche-icon-badge {
+  position: absolute; top: 10px; left: 10px;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.92); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.marche-info { padding: 16px 18px 20px; }
 .marche-nom { font-weight: 700; font-size: 14px; color: var(--texte); margin: 0 0 4px; }
 .marche-commune { font-size: 12px; color: var(--texte-sec); margin: 0 0 10px; }
 .marche-badge { display: inline-block; background: #dcfce7; color: #166534; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
 
-/* ── DEVENIR COURSIÈRE ── */
-.devenir { padding: 90px 0; background: var(--fond); }
-.devenir-grid { display: flex; flex-direction: column; align-items: center; gap: 28px; max-width: 900px; margin: 0 auto; }
-.devenir-cta {
-  background: var(--vert);
-  color: white;
-  padding: 15px 36px;
-  border-radius: var(--radius);
-  font-size: 15px;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.devenir-cta:hover { background: var(--vert-dark); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(29,158,117,0.25); }
-
-/* Démo téléphone — photo plein cadre façon story */
-.demo-phone-wrap { display: flex; flex-direction: column; align-items: center; width: 100%; }
-.demo-phone {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  border-radius: 26px;
-  overflow: hidden;
-  box-shadow: 0 16px 40px rgba(29,158,117,0.22);
-  background: linear-gradient(160deg, var(--vert-dark) 0%, var(--vert) 100%);
-}
-.demo-progress-row { position: absolute; top: 14px; left: 14px; right: 14px; display: flex; gap: 6px; z-index: 3; }
-.demo-progress-seg { flex: 1; height: 3px; border-radius: 3px; background: rgba(255,255,255,0.35); overflow: hidden; }
-.demo-progress-fill { height: 100%; width: 0%; background: white; border-radius: 3px; }
-.demo-progress-fill.filled { width: 100%; }
-@keyframes progressFill { from { width: 0%; } to { width: 100%; } }
-.demo-etape-photo {
-  position: absolute; inset: 0;
-  background-size: cover;
-  background-position: center;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-.demo-scrim {
-  position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.2) 48%, transparent 72%);
-}
-.demo-badge-float {
-  position: absolute; top: 32px; right: 16px; z-index: 2;
-  width: 40px; height: 40px; border-radius: 50%;
-  background: white; display: flex; align-items: center; justify-content: center;
-  font-size: 19px; box-shadow: 0 4px 12px rgba(0,0,0,0.28);
-}
-.demo-texte-bas { position: relative; z-index: 2; padding: 20px; color: white; text-align: left; }
-.demo-titre { font-size: 17px; font-weight: 800; margin: 0 0 4px; }
-.demo-texte { font-size: 13px; opacity: 0.85; margin: 0; }
-.demo-swap-enter-active, .demo-swap-leave-active { transition: opacity 0.35s ease; }
-.demo-swap-enter-from, .demo-swap-leave-to { opacity: 0; }
-.demo-legende { font-size: 11px; color: var(--texte-sec); margin: 14px 0 0; }
+/* ── TÉMOIGNAGES ── */
+.temoignages { padding: 90px 0; background: var(--ivoire); }
+.temoignages-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+.temoignage-card { background: white; border-radius: 16px; padding: 28px; box-shadow: var(--shadow); border: 0.5px solid var(--bordure); }
+.temoignage-texte { font-size: 15px; color: var(--texte); font-style: italic; line-height: 1.7; margin: 0 0 20px; }
+.temoignage-auteur { display: flex; align-items: center; gap: 12px; }
+.temoignage-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--vert-light); color: var(--vert-dark); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
+.temoignage-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.temoignage-auteur p { font-size: 14px; font-weight: 700; color: var(--texte); margin: 0; }
 
 /* ── WHY ── */
 .why { padding: 90px 0; background: white; }
 .why-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; }
 .why-card { background: var(--fond); border-radius: 14px; padding: 28px; border: 0.5px solid var(--bordure); transition: all 0.2s; }
 .why-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--vert); }
-.why-icon { font-size: 36px; display: block; margin-bottom: 14px; }
+.why-icon-badge {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px; background: var(--vert-light); color: var(--vert-dark);
+}
+.why-icon-badge.shield { background: var(--dore-light); color: var(--dore-dark); }
+.why-icon-badge.chat { background: var(--dore-light); color: var(--dore-dark); }
 .why-card h3 { font-size: 16px; font-weight: 700; color: var(--texte); margin-bottom: 8px; }
 .why-card p { font-size: 14px; color: var(--texte-sec); line-height: 1.7; }
 
@@ -667,4 +629,8 @@ const whys = [
 .cta h2 { font-size: 34px; font-weight: 800; color: white; margin-bottom: 12px; }
 .cta p { font-size: 17px; color: rgba(255,255,255,0.85); margin-bottom: 36px; }
 .cta-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+/* ── SCROLL REVEAL ── */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.revealed { opacity: 1; transform: none; }
 </style>

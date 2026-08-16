@@ -4,7 +4,7 @@
 
       <!-- HEADER -->
       <div class="ob-header">
-        <div class="ob-logo">🛍️ MamiMarché</div>
+        <div class="ob-logo">🛍️ Achètlà</div>
         <h1>Bienvenue {{ authStore.user?.prenom }} ! 👋</h1>
         <p>Suivez ces étapes pour commencer à recevoir des courses</p>
         <div class="ob-progress">
@@ -123,7 +123,7 @@
       <div class="ob-termine" v-if="etapesRequisesFaites">
         <div class="ob-termine-icon">🎉</div>
         <h2>Vous êtes prête !</h2>
-        <p v-if="c.unitesActives">Votre profil est configuré. Vous pouvez maintenant recevoir des courses sur MamiMarché.</p>
+        <p v-if="c.unitesActives">Votre profil est configuré. Vous pouvez maintenant recevoir des courses sur Achètlà.</p>
         <p v-else>Votre profil est configuré. Activez vos unités depuis votre dashboard dès que vous êtes prête à recevoir des courses.</p>
         <button class="btn-dashboard" @click="router.push('/coursiere/dashboard')">
           Accéder à mon dashboard →

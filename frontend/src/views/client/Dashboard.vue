@@ -29,7 +29,7 @@
           <div class="avatar-big">{{ initiales }}</div>
           <div>
             <h1>Bonjour, {{ authStore.user?.prenom }} 👋</h1>
-            <p>📍 {{ authStore.user?.commune }} · Client MamiMarché</p>
+            <p>📍 {{ authStore.user?.commune }} · Client Achètlà</p>
           </div>
         </div>
         <div class="dash-header-stats">
@@ -326,13 +326,13 @@
             <div class="paiement-details">
               <div class="recap-item"><span>Budget courses</span><strong>{{ budgetCourses }} F CFA</strong></div>
               <div class="recap-item"><span>Frais prestation</span><strong>{{ fraisPrestation }} F CFA</strong></div>
-              <div class="recap-item"><span>Frais de service MamiMarché</span><strong>{{ fraisService }} F CFA</strong></div>
+              <div class="recap-item"><span>Frais de service Achètlà</span><strong>{{ fraisService }} F CFA</strong></div>
               <div class="recap-divider"></div>
               <div class="recap-total big"><span>Total à payer</span><strong>{{ totalEstime }} F CFA</strong></div>
             </div>
             <div class="paiement-info">
               <span>🔒</span>
-              <p>Votre paiement transite par la plateforme MamiMarché. Une fois vos courses faites, votre coursière vous proposera un livreur Yango Moto — les frais de livraison seront à régler directement à ce livreur.</p>
+              <p>Votre paiement transite par la plateforme Achètlà. Une fois vos courses faites, votre coursière vous proposera un livreur Yango Moto — les frais de livraison seront à régler directement à ce livreur.</p>
             </div>
             <button class="btn-wave" @click="payerWave">🌊 Payer {{ totalEstime }} F via Wave</button>
             <button class="btn-back" style="width:100%;margin-top:10px" @click="etape = 3">← Retour au tchat</button>
@@ -395,7 +395,7 @@
         <div v-else class="confirmation">
           <div class="confirm-icon">🎉</div>
           <h2>Commande confirmée !</h2>
-          <p>Votre commande a été livrée par <strong>{{ coursiereChos?.nom }}</strong> via le livreur <strong>{{ livraisonData?.livreurNom }}</strong>. Merci d'avoir utilisé MamiMarché !</p>
+          <p>Votre commande a été livrée par <strong>{{ coursiereChos?.nom }}</strong> via le livreur <strong>{{ livraisonData?.livreurNom }}</strong>. Merci d'avoir utilisé Achètlà !</p>
           <div class="confirm-steps">
             <div class="confirm-step done">✓ Paiement reçu</div>
             <div class="confirm-step done">✓ Livreur réservé</div>

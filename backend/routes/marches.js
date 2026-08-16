@@ -19,10 +19,17 @@ const MARCHES_INITIAUX = [
   { nom: "Marché Gouro d'Abobo", commune: 'Abobo', icon: '🛒', lat: 5.4181, lng: -4.0154 }
 ]
 
+// Ce contrôle/backfill est un besoin de démarrage (seed), pas un besoin par requête —
+// le refaire à chaque appel ajoutait ~2s de latence réseau vers MongoDB Atlas sur
+// chaque chargement de /marches (jusqu'à 20 allers-retours séquentiels).
+let marchesInitiauxVerifies = false
+
 async function assurerMarchesInitiaux() {
+  if (marchesInitiauxVerifies) return
   const total = await Marche.countDocuments()
   if (total === 0) {
     await Marche.insertMany(MARCHES_INITIAUX)
+    marchesInitiauxVerifies = true
     return
   }
   // Complète les coordonnées des marchés déjà existants qui n'en ont pas encore,
@@ -32,6 +39,7 @@ async function assurerMarchesInitiaux() {
     const existe = await Marche.exists({ nom: m.nom })
     if (!existe) await Marche.create(m)
   }
+  marchesInitiauxVerifies = true
 }
 
 // GET /api/marches — Liste des marchés (?actif=true pour ne garder que les actifs) — public

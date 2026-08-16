@@ -1,9 +1,9 @@
 <template>
   <div class="auth-page">
     <div class="auth-card card">
-      <div class="auth-logo">🛍️ MamiMarché</div>
+      <div class="auth-logo">🛍️ Achètlà</div>
       <h1>Inscription</h1>
-      <p class="auth-sub">Rejoignez MamiMarché dès aujourd'hui</p>
+      <p class="auth-sub">Rejoignez Achètlà dès aujourd'hui</p>
       <div v-if="erreur" class="erreur-msg">{{ erreur }}</div>
       <form @submit.prevent="sInscrire">
         <div class="form-row">

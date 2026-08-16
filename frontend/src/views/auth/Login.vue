@@ -1,7 +1,7 @@
 <template>
   <div class="auth-page">
     <div class="auth-card">
-      <div class="auth-logo">🛍️ MamiMarché</div>
+      <div class="auth-logo">🛍️ Achètlà</div>
       <h1>Connexion</h1>
       <p class="auth-sub">Bon retour parmi nous 👋</p>
 
@@ -37,7 +37,7 @@
         <button class="modal-close" @click="showAdminModal = false">✕</button>
         <div class="modal-admin-icon">🛠️</div>
         <h3>Espace Administrateur</h3>
-        <p>Accès réservé à l'équipe MamiMarché</p>
+        <p>Accès réservé à l'équipe Achètlà</p>
 
         <div v-if="erreurAdmin" class="erreur-msg">{{ erreurAdmin }}</div>
 
